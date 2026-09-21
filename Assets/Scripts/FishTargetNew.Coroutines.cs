@@ -98,23 +98,33 @@ public partial class FishTargetNew
         Vector3 liftDirection = horizontalDirection * Mathf.Cos(angle) + Vector3.up * Mathf.Sin(angle);
         Vector3 endPosition = startPosition + liftDirection.normalized * liftDistance;
 
+        float countdownStep = Random.Range(countdownStepRange.x, countdownStepRange.y);
+        float flightDuration = countdownStep * 3f;
         float timer = 0f;
+        int shownNumber = 0;
 
-        while (timer < liftTime)
+        while (timer < flightDuration)
         {
             timer += Time.deltaTime;
-            float t = Mathf.Clamp01(timer / liftTime);
+            int number = Mathf.Clamp(3 - Mathf.FloorToInt(timer / countdownStep), 1, 3);
+            if (number != shownNumber)
+            {
+                shownNumber = number;
+                gaugeUI.ShowCountdown(number);
+            }
+            float t = Mathf.Clamp01(timer / flightDuration);
             SetFishPosition(Vector3.Lerp(startPosition, endPosition, t));
             lineController.UpdateAILine(aiLineStartPoint, GetFishLinePosition());
             yield return null;
         }
 
         SetFishPosition(endPosition);
+        gaugeUI.HideCountdown();
         HookByAI();
 
         timer = 0f;
 
-        while (timer < glowDuration && currentState == FishState.HookedByAI)
+        while (timer < Mathf.Min(glowDuration, goodTime) && currentState == FishState.HookedByAI)
         {
             timer += Time.deltaTime;
             lineController.UpdateAILine(aiLineStartPoint, GetFishLinePosition());
@@ -123,7 +133,8 @@ public partial class FishTargetNew
 
         if (currentState == FishState.HookedByAI)
         {
-            SetIdle();
+            contestBalance = -maxGauge;
+            FinishContest();
         }
 
         aiCatchCoroutine = null;
@@ -147,6 +158,27 @@ public partial class FishTargetNew
         }
         SetFishPosition(destination);
         visualController.RestoreOriginal();
-        if (hideAfterResult) gameObject.SetActive(false);
+        if (playerStress >= 100f || aiStress >= 100f)
+        {
+            stageComplete = true;
+            gaugeUI.HideStress();
+            if (playerFishingRod != null) playerFishingRod.SetActive(false);
+            PlayerController player = playerAnimator != null ? playerAnimator.GetComponent<PlayerController>() : null;
+            if (aiStress >= 100f && enemyIntro != null)
+            {
+                enemyIntro.PlayStumble();
+                yield return new WaitForSeconds(1.6f);
+            }
+            if (enemyIntro != null) enemyIntro.ResetStage();
+            if (player != null) player.EndStage(playerStress >= 100f, gaugeUI);
+            if (hideAfterResult) gameObject.SetActive(false);
+            yield break;
+        }
+        yield return new WaitForSeconds(nextRoundDelay);
+        if (playerFishingRod != null) playerFishingRod.SetActive(false);
+        if (enemyIntro != null) yield return enemyIntro.WaitForAIFishGetCamera();
+        SetFishPosition(initialFishPosition);
+        if (enemyIntro != null) yield return enemyIntro.ReplayFishingSwingAndWait();
+        StartAICatch(aiLineStartPoint);
     }
 }

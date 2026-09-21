@@ -39,6 +39,15 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float freeLookReturnSpeed = 12f;
     [SerializeField] private float minCameraPitch = -10f;
     [SerializeField] private float maxCameraPitch = 75f;
+    [SerializeField] private Transform playerVisual;
+    [SerializeField] private float backwardCameraYaw = 12f;
+    [SerializeField] private float backwardCameraFov = 64f;
+
+    [Header("Water")]
+    [SerializeField] private Transform waterSurface;
+    [SerializeField] private float waterDoubleTapWindow = 0.35f;
+    [SerializeField] private float waterEscapeJumpHeight = 40f;
+    [SerializeField] private float waterSinkSpeed = 3f;
 
     [Header("Sunbed")]
     [SerializeField] private Transform interactionPoint;
@@ -62,6 +71,16 @@ public class PlayerController : MonoBehaviour
     private float dashTime = 1f;
     private float freeLookYaw;
     private float cameraPitch;
+    private float defaultCameraFov;
+    private float backwardBlend;
+    private Quaternion visualReadyRotation;
+    private bool isBackwardRunning;
+    private bool isInWater;
+    private bool isGameOver;
+    private float lastWaterJumpPress = -10f;
+    private float lastWaterBurstTime = -10f;
+    private Vector3 preStagePosition;
+    private Quaternion preStageRotation;
 
     InputSystem_Actions inputActions;
     Coroutine dashCoroutine;
@@ -82,6 +101,8 @@ public class PlayerController : MonoBehaviour
     {
         controller = GetComponent<CharacterController>();
         playerAnimator = GetComponent<Animator>();
+        if (playerVisual != null) visualReadyRotation = playerVisual.localRotation;
+        if (followCamera != null) defaultCameraFov = followCamera.Lens.FieldOfView;
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -108,6 +129,7 @@ public class PlayerController : MonoBehaviour
     }
     void Update()
     {
+        if (isGameOver) return;
         if (isUsingSunbed)
         {
             return;
@@ -120,9 +142,11 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
+        UpdateWaterState();
         isGround = IsGround();
 
         verticalVelocity += gravity * Time.deltaTime;
+        if (isInWater && verticalVelocity < -waterSinkSpeed) verticalVelocity = -waterSinkSpeed;
         moveDirection.y = verticalVelocity;
         controller.Move(moveDirection * Time.deltaTime);
 
@@ -138,6 +162,23 @@ public class PlayerController : MonoBehaviour
     }
     public void JumpCheck()
     {
+        bool jumpPressed = inputActions.Player.Jump.WasPressedThisFrame();
+        if (isInWater)
+        {
+            if (jumpPressed)
+            {
+                if (Time.time - lastWaterJumpPress <= waterDoubleTapWindow &&
+                    Time.time - lastWaterBurstTime > 1f)
+                {
+                    lastWaterBurstTime = Time.time;
+                    lastWaterJumpPress = -10f;
+                    verticalVelocity = Mathf.Sqrt(waterEscapeJumpHeight * -2f * gravity);
+                    playerAnimator.SetTrigger("Jump");
+                }
+                else lastWaterJumpPress = Time.time;
+            }
+            return;
+        }
         if (isGround)
         {
             if (verticalVelocity < 0f)
@@ -145,7 +186,7 @@ public class PlayerController : MonoBehaviour
                 verticalVelocity = -2f;
             }
 
-            if (inputActions.Player.Jump.WasPressedThisFrame())
+            if (jumpPressed)
             {
                 playerAnimator.SetTrigger("Jump");
 
@@ -153,6 +194,26 @@ public class PlayerController : MonoBehaviour
 
                 verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             }
+        }
+    }
+
+    private void UpdateWaterState()
+    {
+        bool wasInWater = isInWater;
+        Renderer surfaceRenderer = waterSurface != null ? waterSurface.GetComponent<Renderer>() : null;
+        if (surfaceRenderer == null) isInWater = false;
+        else
+        {
+            Bounds bounds = surfaceRenderer.bounds;
+            Vector3 position = transform.position;
+            isInWater = position.x >= bounds.min.x && position.x <= bounds.max.x &&
+                position.z >= bounds.min.z && position.z <= bounds.max.z &&
+                position.y <= waterSurface.position.y + 1f;
+        }
+        if (isInWater != wasInWater)
+        {
+            playerAnimator.SetBool("IsSwimming", isInWater);
+            lastWaterJumpPress = -10f;
         }
     }
     bool IsGround()
@@ -179,6 +240,7 @@ public class PlayerController : MonoBehaviour
         bool isIdle = !hasMoveInput;
         bool isWalking = hasMoveInput && !sprintPressed;
         bool isRunning = hasMoveInput && sprintPressed;
+        isBackwardRunning = isRunning && moveInput.y < -0.1f;
 
         float currentSpeed = isRunning ? runSpeed : moveSpeed;
 
@@ -187,6 +249,17 @@ public class PlayerController : MonoBehaviour
         playerAnimator.SetBool("IsIdle", isIdle);
         playerAnimator.SetBool("IsWalking", isWalking);
         playerAnimator.SetBool("IsRunning", isRunning);
+    }
+
+    private void LateUpdate()
+    {
+        if (isGameOver || isUsingSunbed) return;
+        backwardBlend = Mathf.MoveTowards(backwardBlend, isBackwardRunning ? 1f : 0f, Time.deltaTime * 3.5f);
+        if (playerVisual != null)
+            playerVisual.localRotation = Quaternion.Slerp(visualReadyRotation,
+                visualReadyRotation * Quaternion.Euler(0f, 180f, 0f), backwardBlend);
+        if (followCamera != null)
+            followCamera.Lens.FieldOfView = Mathf.Lerp(defaultCameraFov, backwardCameraFov, backwardBlend);
     }
     public void Dash()
     {
@@ -213,7 +286,7 @@ public class PlayerController : MonoBehaviour
             cameraPitch -= lookInput.y * verticalLookSensitivity;
             cameraPitch = Mathf.Clamp(cameraPitch, minCameraPitch, maxCameraPitch);
 
-            orbitalFollow.HorizontalAxis.Value = cameraPitch;
+            orbitalFollow.VerticalAxis.Value = cameraPitch;
         }
         if (isFreeLook)
         {
@@ -221,7 +294,7 @@ public class PlayerController : MonoBehaviour
 
             if (orbitalFollow != null)
             {
-                orbitalFollow.HorizontalAxis.Value = freeLookYaw;
+                orbitalFollow.HorizontalAxis.Value = freeLookYaw + backwardCameraYaw * backwardBlend;
             }
 
             return;
@@ -232,7 +305,7 @@ public class PlayerController : MonoBehaviour
         if (orbitalFollow != null)
         {
             freeLookYaw = Mathf.LerpAngle(freeLookYaw, 0f, Time.deltaTime * freeLookReturnSpeed);
-            orbitalFollow.HorizontalAxis.Value = freeLookYaw;
+            orbitalFollow.HorizontalAxis.Value = freeLookYaw + backwardCameraYaw * backwardBlend;
         }
     }
     void CheckSunbedInteraction()
@@ -266,6 +339,8 @@ public class PlayerController : MonoBehaviour
 
     IEnumerator SunbedCoroutine()
     {
+        preStagePosition = transform.position;
+        preStageRotation = transform.rotation;
         isUsingSunbed = true;
         isActionLocked = true;
 
@@ -327,6 +402,39 @@ public class PlayerController : MonoBehaviour
         if (enemyIntro != null)
         {
             enemyIntro.PlayIntro();
+        }
+    }
+
+    public void EndStage(bool gameOver, FishGaugeUI ui)
+    {
+        StartCoroutine(EndStageCoroutine(gameOver, ui));
+    }
+
+    private IEnumerator EndStageCoroutine(bool gameOver, FishGaugeUI ui)
+    {
+        isStageStarted = false;
+        isUsingSunbed = false;
+        isActionLocked = gameOver;
+        moveDirection = Vector3.zero;
+        verticalVelocity = 0f;
+        isBackwardRunning = false;
+        backwardBlend = 0f;
+        if (playerVisual != null) playerVisual.localRotation = visualReadyRotation;
+        playerAnimator.SetBool("IsSwimming", false);
+        playerAnimator.Rebind();
+        playerAnimator.Update(0f);
+        controller.enabled = false;
+        transform.SetPositionAndRotation(preStagePosition, preStageRotation);
+        controller.enabled = true;
+        stageCamera.gameObject.SetActive(false);
+        if (followCamera != null) followCamera.gameObject.SetActive(true);
+        if (followCamera != null) followCamera.Lens.FieldOfView = defaultCameraFov;
+        if (gameOver)
+        {
+            isGameOver = true;
+            playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
+            yield return new WaitForSeconds(1.6f);
+            if (ui != null) ui.ShowGameOver();
         }
     }
     IEnumerator DashCoroutine()

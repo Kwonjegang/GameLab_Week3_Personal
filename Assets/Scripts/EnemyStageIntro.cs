@@ -38,7 +38,7 @@ public class EnemyStageIntro : MonoBehaviour
 
     [Header("Fish Lift")]
     [SerializeField] private FishTargetNew targetFish;
-    [SerializeField] private float fishLiftDelay = 1.5f;
+    [SerializeField] private Vector2 fishLiftDelayRange = new Vector2(0.9f, 2.2f);
 
     private GameObject spawnedFisingRod;
     private Transform fishingLineStartPoint;
@@ -46,9 +46,13 @@ public class EnemyStageIntro : MonoBehaviour
     private Material[] materials;
     private Animator animator;
     private bool isPlaying;
+    private Vector3 initialPosition;
+    private Quaternion initialRotation;
 
     private void Awake()
     {
+        initialPosition = transform.position;
+        initialRotation = transform.rotation;
         animator = GetComponent<Animator>();
         renderers = GetComponentsInChildren<Renderer>();
 
@@ -73,6 +77,29 @@ public class EnemyStageIntro : MonoBehaviour
         }
         gameObject.SetActive(true);
         StartCoroutine(IntroCoroutine());
+    }
+    public void PlayStumble()
+    {
+        if (animator != null) animator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
+    }
+
+    public void ResetStage()
+    {
+        StopAllCoroutines();
+        if (spawnedFisingRod != null) Destroy(spawnedFisingRod);
+        spawnedFisingRod = null;
+        fishingLineStartPoint = null;
+        if (animator != null)
+        {
+            animator.Rebind();
+            animator.Update(0f);
+        }
+        transform.SetPositionAndRotation(initialPosition, initialRotation);
+        SetAlpha(0f);
+        if (stageCamera != null) stageCamera.gameObject.SetActive(false);
+        if (AIFishGetCamera != null) AIFishGetCamera.gameObject.SetActive(false);
+        if (FishFocusCamera != null) FishFocusCamera.gameObject.SetActive(false);
+        isPlaying = false;
     }
     void SpawnFishingRod()
     {
@@ -147,6 +174,33 @@ public class EnemyStageIntro : MonoBehaviour
         stageCamera.gameObject.SetActive(false);
         AIFishGetCamera.gameObject.SetActive(false);
         FishFocusCamera.gameObject.SetActive(true);
+    }
+
+    public void SwitchToAIFishGetCamera()
+    {
+        stageCamera.gameObject.SetActive(false);
+        FishFocusCamera.gameObject.SetActive(false);
+        AIFishGetCamera.gameObject.SetActive(true);
+    }
+
+    public IEnumerator WaitForAIFishGetCamera()
+    {
+        SwitchToAIFishGetCamera();
+        yield return null;
+        CinemachineBrain brain = Camera.main != null ? Camera.main.GetComponent<CinemachineBrain>() : null;
+        while (brain != null && brain.IsBlending)
+            yield return null;
+    }
+
+    public IEnumerator ReplayFishingSwingAndWait()
+    {
+        if (animator != null)
+        {
+            animator.ResetTrigger("Swing");
+            animator.SetTrigger("Swing");
+        }
+        StartCoroutine(SwingFishingCoroutine());
+        yield return new WaitForSeconds(Random.Range(fishLiftDelayRange.x, fishLiftDelayRange.y));
     }
 
     private IEnumerator RestoreBlendAfterFocus(CinemachineBrain brain, CinemachineBlendDefinition previous)
@@ -320,7 +374,7 @@ public class EnemyStageIntro : MonoBehaviour
         }
         StartCoroutine(SwingFishingCoroutine());
 
-        yield return new WaitForSeconds(fishLiftDelay);
+        yield return new WaitForSeconds(Random.Range(fishLiftDelayRange.x, fishLiftDelayRange.y));
 
         if (targetFish != null)
         {

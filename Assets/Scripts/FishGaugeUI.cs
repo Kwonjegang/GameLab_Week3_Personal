@@ -3,131 +3,205 @@ using UnityEngine.UI;
 
 public class FishGaugeUI : MonoBehaviour
 {
+    [Header("Scene UI")]
+    [SerializeField] private RectTransform canvasRect;
+    [SerializeField] private GameObject dimmerRoot;
+    [SerializeField] private RectTransform[] dimmerPanels;
     [SerializeField] private GameObject gaugeRoot;
-    [SerializeField] private Slider playerGaugeSlider;
-    [SerializeField] private Slider aiGaugeSlider;
-    [SerializeField] private float maxGauge = 100f;
-    private Canvas canvas;
-    private GameObject dimmer;
+    [SerializeField] private RectTransform tugMarker;
+    [SerializeField] private Image playerSideFill;
+    [SerializeField] private Image aiSideFill;
+    [SerializeField] private GameObject stressRoot;
+    [SerializeField] private Text countdownText;
+    [SerializeField] private GameObject gameOverRoot;
+    [SerializeField] private Image playerStressFill;
+    [SerializeField] private Image aiStressFill;
+    [SerializeField] private float markerTravel = 210f;
+    [SerializeField] private float stressBarWidth = 270f;
+    [SerializeField] private float holePadding = 45f;
+    private Renderer highlightedFish;
 
-    public void Configure(GameObject root, Slider playerSlider, Slider aiSlider, float gaugeMaxValue)
+    public void Configure(RectTransform canvas, GameObject dimmer, RectTransform[] panels,
+        GameObject gauge, RectTransform marker, Image playerFill, Image aiFill,
+        GameObject stressPanel, Image playerStress, Image aiStress, Text countdown, GameObject gameOver, float travel)
     {
-        gaugeRoot = root != null ? root : gaugeRoot;
-        playerGaugeSlider = playerSlider != null ? playerSlider : playerGaugeSlider;
-        aiGaugeSlider = aiSlider != null ? aiSlider : aiGaugeSlider;
-        maxGauge = gaugeMaxValue;
+        if (canvas != null) canvasRect = canvas;
+        if (dimmer != null) dimmerRoot = dimmer;
+        if (panels != null && panels.Length == 4) dimmerPanels = panels;
+        if (gauge != null) gaugeRoot = gauge;
+        if (marker != null) tugMarker = marker;
+        if (playerFill != null) playerSideFill = playerFill;
+        if (aiFill != null) aiSideFill = aiFill;
+        if (stressPanel != null) stressRoot = stressPanel;
+        if (playerStress != null) playerStressFill = playerStress;
+        if (aiStress != null) aiStressFill = aiStress;
+        if (countdown != null) countdownText = countdown;
+        if (gameOver != null) gameOverRoot = gameOver;
+        markerTravel = travel;
     }
 
     public void Initialize()
     {
-        if (gaugeRoot == null || playerGaugeSlider == null || aiGaugeSlider == null) BuildUI();
-        UpdateGauge(0f, 0f);
-    }
-
-    private void BuildUI()
-    {
-        GameObject canvasObject = new GameObject("FishContestCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 80;
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        dimmer = MakeImage("FishArrivalDim", canvasObject.transform, new Color(0.01f, 0.02f, 0.05f, 0.48f));
-        RectTransform dimRect = dimmer.GetComponent<RectTransform>();
-        dimRect.anchorMin = Vector2.zero;
-        dimRect.anchorMax = Vector2.one;
-        dimRect.offsetMin = dimRect.offsetMax = Vector2.zero;
-        dimmer.SetActive(false);
-        gaugeRoot = MakeImage("FishContestGauge", canvasObject.transform, new Color(0.025f, 0.055f, 0.1f, 0.92f));
-        RectTransform panel = gaugeRoot.GetComponent<RectTransform>();
-        panel.anchorMin = panel.anchorMax = new Vector2(0.5f, 1f);
-        panel.pivot = new Vector2(0.5f, 1f);
-        panel.anchoredPosition = new Vector2(0f, -65f);
-        panel.sizeDelta = new Vector2(620f, 170f);
-        MakeText(panel, "MASH F  /  FIRST TO 100 WINS THE FISH", new Vector2(0f, -23f), 24, Color.white, 600f);
-        MakeText(panel, "PLAYER", new Vector2(-245f, -72f), 20, new Color(0.2f, 0.85f, 1f), 105f);
-        MakeText(panel, "AI", new Vector2(-245f, -122f), 20, new Color(1f, 0.45f, 0.42f), 105f);
-        playerGaugeSlider = MakeGauge(panel, -72f, new Color(0.18f, 0.78f, 1f));
-        aiGaugeSlider = MakeGauge(panel, -122f, new Color(1f, 0.38f, 0.36f));
-        gaugeRoot.SetActive(false);
-    }
-
-    private static GameObject MakeImage(string name, Transform parent, Color color)
-    {
-        GameObject obj = new GameObject(name, typeof(RectTransform), typeof(Image));
-        obj.transform.SetParent(parent, false);
-        Image image = obj.GetComponent<Image>();
-        image.color = color;
-        image.raycastTarget = false;
-        return obj;
-    }
-
-    private static void MakeText(Transform parent, string value, Vector2 position, int size, Color color, float width)
-    {
-        GameObject obj = new GameObject(value, typeof(RectTransform), typeof(Text));
-        obj.transform.SetParent(parent, false);
-        RectTransform rect = obj.GetComponent<RectTransform>();
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = position;
-        rect.sizeDelta = new Vector2(width, 34f);
-        Text label = obj.GetComponent<Text>();
-        label.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        label.text = value;
-        label.fontSize = size;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.color = color;
-        label.raycastTarget = false;
-    }
-
-    private static Slider MakeGauge(Transform parent, float y, Color color)
-    {
-        GameObject root = new GameObject("Gauge", typeof(RectTransform), typeof(Slider));
-        root.transform.SetParent(parent, false);
-        RectTransform rect = root.GetComponent<RectTransform>();
-        rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1f);
-        rect.anchoredPosition = new Vector2(57f, y);
-        rect.sizeDelta = new Vector2(460f, 25f);
-        GameObject track = MakeImage("Track", root.transform, new Color(0.12f, 0.18f, 0.24f));
-        GameObject fill = MakeImage("Fill", track.transform, color);
-        foreach (GameObject obj in new[] { track, fill })
+        if (canvasRect != null)
         {
-            RectTransform r = obj.GetComponent<RectTransform>();
-            r.anchorMin = Vector2.zero;
-            r.anchorMax = Vector2.one;
-            r.offsetMin = r.offsetMax = Vector2.zero;
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            foreach (Text label in canvasRect.GetComponentsInChildren<Text>(true))
+                if (label.font == null) label.font = font;
         }
-        Slider slider = root.GetComponent<Slider>();
-        slider.fillRect = fill.GetComponent<RectTransform>();
-        slider.direction = Slider.Direction.LeftToRight;
-        slider.interactable = false;
-        return slider;
+        UpdateGauge(0f, 100f);
+        UpdateStress(0f, 0f);
+        Hide();
+        HideCountdown();
+        if (stressRoot != null) stressRoot.SetActive(false);
+        HideGameOver();
     }
 
-    public void ShowArrival() { if (dimmer != null) dimmer.SetActive(true); }
-    public void ClearArrival() { if (dimmer != null) dimmer.SetActive(false); }
-    public void Show(float playerGauge, float aiGauge)
+    public void ShowCountdown(int number)
+    {
+        if (countdownText == null) return;
+        countdownText.gameObject.SetActive(true);
+        countdownText.text = number.ToString();
+        countdownText.color = new Color(1f, 0.9f, 0.42f);
+        countdownText.rectTransform.localScale = Vector3.one * 1.25f;
+    }
+
+    public void ShowParryCue()
+    {
+        if (countdownText == null) return;
+        countdownText.gameObject.SetActive(true);
+        countdownText.text = "F!";
+        countdownText.color = new Color(0.2f, 0.95f, 1f);
+        countdownText.rectTransform.localScale = Vector3.one * 1.4f;
+    }
+
+    public void ShowParryResult(string result)
+    {
+        if (countdownText == null) return;
+        countdownText.gameObject.SetActive(true);
+        countdownText.text = result;
+        countdownText.color = Color.white;
+        countdownText.rectTransform.localScale = Vector3.one;
+    }
+
+    public void HideCountdown()
+    {
+        if (countdownText != null) countdownText.gameObject.SetActive(false);
+    }
+
+    public void ShowStress()
+    {
+        if (stressRoot != null) stressRoot.SetActive(true);
+    }
+
+    public void HideStress()
+    {
+        if (stressRoot != null) stressRoot.SetActive(false);
+    }
+
+    public void ShowGameOver()
+    {
+        if (gameOverRoot != null) gameOverRoot.SetActive(true);
+    }
+
+    public void HideGameOver()
+    {
+        if (gameOverRoot != null) gameOverRoot.SetActive(false);
+    }
+
+    public void ShowArrival(Renderer fish)
+    {
+        highlightedFish = fish;
+        if (dimmerRoot != null) dimmerRoot.SetActive(true);
+        UpdateDimmer();
+    }
+
+    public void ClearArrival()
+    {
+        highlightedFish = null;
+        if (dimmerRoot != null) dimmerRoot.SetActive(false);
+    }
+
+    private void LateUpdate()
+    {
+        if (highlightedFish != null && dimmerRoot != null && dimmerRoot.activeSelf) UpdateDimmer();
+    }
+
+    private void UpdateDimmer()
+    {
+        if (canvasRect == null || dimmerPanels == null || dimmerPanels.Length != 4 || highlightedFish == null) return;
+        Camera camera = Camera.main;
+        if (camera == null) return;
+        Vector3 screen = camera.WorldToScreenPoint(highlightedFish.bounds.center);
+        if (screen.z <= 0f) return;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screen, null, out Vector2 local);
+        float width = canvasRect.rect.width;
+        float height = canvasRect.rect.height;
+        float x = Mathf.Clamp(local.x + width * 0.5f, 0f, width);
+        float y = Mathf.Clamp(local.y + height * 0.5f, 0f, height);
+        Vector3 edge = camera.WorldToScreenPoint(highlightedFish.bounds.center + camera.transform.up * highlightedFish.bounds.extents.magnitude);
+        float screenRadius = Vector2.Distance(new Vector2(screen.x, screen.y), new Vector2(edge.x, edge.y));
+        float radius = Mathf.Clamp(screenRadius * width / Mathf.Max(1f, Screen.width) + holePadding, 75f, 300f);
+        float left = Mathf.Clamp(x - radius, 0f, width);
+        float right = Mathf.Clamp(x + radius, 0f, width);
+        float bottom = Mathf.Clamp(y - radius, 0f, height);
+        float top = Mathf.Clamp(y + radius, 0f, height);
+        SetPanel(dimmerPanels[0], 0f, 0f, left, height);
+        SetPanel(dimmerPanels[1], right, 0f, width - right, height);
+        SetPanel(dimmerPanels[2], left, 0f, right - left, bottom);
+        SetPanel(dimmerPanels[3], left, top, right - left, height - top);
+    }
+
+    private static void SetPanel(RectTransform panel, float x, float y, float width, float height)
+    {
+        if (panel == null) return;
+        panel.anchorMin = panel.anchorMax = panel.pivot = Vector2.zero;
+        panel.anchoredPosition = new Vector2(x, y);
+        panel.sizeDelta = new Vector2(width, height);
+    }
+
+    public void Show(float balance, float maximum)
     {
         if (gaugeRoot != null) gaugeRoot.SetActive(true);
-        UpdateGauge(playerGauge, aiGauge);
+        UpdateGauge(balance, maximum);
     }
+
     public void Hide()
     {
         if (gaugeRoot != null) gaugeRoot.SetActive(false);
         ClearArrival();
+        HideCountdown();
     }
-    public void UpdateGauge(float playerGauge, float aiGauge)
+
+    public void UpdateGauge(float balance, float maximum)
     {
-        if (playerGaugeSlider != null)
-        {
-            playerGaugeSlider.maxValue = maxGauge;
-            playerGaugeSlider.value = playerGauge;
-        }
-        if (aiGaugeSlider != null)
-        {
-            aiGaugeSlider.maxValue = maxGauge;
-            aiGaugeSlider.value = aiGauge;
-        }
+        if (tugMarker == null) return;
+        float normalized = Mathf.Clamp(balance / Mathf.Max(1f, maximum), -1f, 1f);
+        Vector2 position = tugMarker.anchoredPosition;
+        position.x = normalized * markerTravel;
+        tugMarker.anchoredPosition = position;
+        SetSideWidth(playerSideFill, Mathf.Max(0f, normalized) * markerTravel);
+        SetSideWidth(aiSideFill, Mathf.Max(0f, -normalized) * markerTravel);
     }
-    private void OnDestroy() { if (canvas != null) Destroy(canvas.gameObject); }
+
+    private static void SetSideWidth(Image image, float width)
+    {
+        if (image == null) return;
+        Vector2 size = image.rectTransform.sizeDelta;
+        size.x = width;
+        image.rectTransform.sizeDelta = size;
+    }
+
+    public void UpdateStress(float playerStress, float aiStress)
+    {
+        SetStressWidth(playerStressFill, playerStress);
+        SetStressWidth(aiStressFill, aiStress);
+    }
+
+    private void SetStressWidth(Image image, float stress)
+    {
+        if (image == null) return;
+        Vector2 size = image.rectTransform.sizeDelta;
+        size.x = stressBarWidth * Mathf.Clamp01(stress / 100f);
+        image.rectTransform.sizeDelta = size;
+    }
 }

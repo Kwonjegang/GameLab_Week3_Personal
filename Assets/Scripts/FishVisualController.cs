@@ -6,7 +6,7 @@ public class FishVisualController : MonoBehaviour
     [Header("Material")]
     [Range(0f, 1f)]
     [SerializeField] private float idleSaturation = 0.08f;
-    [SerializeField] private float glowPower = 2f;
+    [SerializeField] private float glowPower = 0.5f;
 
     [Header("Wiggle")]
     [SerializeField] private float fishWiggleScale = 0.85f;
@@ -60,6 +60,16 @@ public class FishVisualController : MonoBehaviour
         fishBaseScale = fishMoveTarget.localScale;
         MakeVisualMaterials();
         isInitialized = true;
+    }
+
+    public void RefreshMaterials(Renderer targetRenderer, Transform moveTarget)
+    {
+        if (fishWiggleTween != null) fishWiggleTween.Kill();
+        fishRenderer = targetRenderer;
+        fishMoveTarget = moveTarget;
+        isInitialized = false;
+        Initialize();
+        SetIdle();
     }
 
     public void SetIdle()

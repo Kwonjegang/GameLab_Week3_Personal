@@ -32,19 +32,21 @@ public partial class FishTargetNew
         lineController.Configure(aiFishingLine, playerFishingLine, fishingLineMaterial, fishingLineColor, fishingLineWidth);
         lineController.Initialize();
 
-        gaugeUI.Configure(gaugeRoot, playerGaugeSlider, aiGaugeSlider, maxGauge);
+        gaugeUI.Configure(canvasRect, dimmerRoot, dimmerPanels, gaugeRoot, tugMarker,
+            playerSideFill, aiSideFill, stressRoot, playerStressFill, aiStressFill, countdownText, gameOverRoot, markerTravel);
         gaugeUI.Initialize();
         gaugeUI.Hide();
 
         visualController.Configure(fishRenderer, fishMoveTarget, idleSaturation, glowPower, fishWiggleScale, fishWiggleDistance, fishWiggleTime);
         visualController.Initialize();
+        initialFishPosition = GetFishPosition();
 
         if (playerFishingRod != null)
         {
             if (playerRodSocket != null)
             {
                 playerFishingRod.transform.SetParent(playerRodSocket, false);
-                playerFishingRod.transform.localPosition = Vector3.zero;
+                playerFishingRod.transform.localPosition = playerRodGripLocalPosition;
                 playerFishingRod.transform.localRotation = Quaternion.identity;
                 playerFishingRod.transform.localScale = Vector3.one;
                 Transform model = playerFishingRod.transform.childCount > 0 ? playerFishingRod.transform.GetChild(0) : null;
@@ -76,5 +78,19 @@ public partial class FishTargetNew
         }
 
         return true;
+    }
+
+    private void ChooseRandomFish()
+    {
+        if (fishVariants == null || fishVariants.Length == 0 || fishRenderer == null) return;
+        GameObject variant = fishVariants[Random.Range(0, fishVariants.Length)];
+        if (variant == null) return;
+        MeshFilter sourceMesh = variant.GetComponentInChildren<MeshFilter>();
+        Renderer sourceRenderer = variant.GetComponentInChildren<Renderer>();
+        MeshFilter targetMesh = fishRenderer.GetComponent<MeshFilter>();
+        if (sourceMesh == null || sourceRenderer == null || targetMesh == null) return;
+        targetMesh.sharedMesh = sourceMesh.sharedMesh;
+        fishRenderer.sharedMaterials = sourceRenderer.sharedMaterials;
+        visualController.RefreshMaterials(fishRenderer, fishMoveTarget);
     }
 }

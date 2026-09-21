@@ -16,39 +16,37 @@ public partial class FishTargetNew : MonoBehaviour
     [Header("State")]
     public FishState currentState = FishState.Idle;
 
-    [Header("Time")]
-    [SerializeField] private float contestDuration = 4f;
-
     [Header("Timing Bonus")]
     [SerializeField] private float perfectTime = 0.25f;
-    [SerializeField] private float goodTime = 0.85f;
-    [SerializeField] private float normalTime = 1.25f;
+    [SerializeField] private float goodTime = 0.55f;
     [SerializeField] private float perfectBonus = 70f;
     [SerializeField] private float goodBonus = 35f;
-    [SerializeField] private float normalBonus = 15f;
-    [SerializeField] private float lateBonus = 5f;
 
     [Header("Contest Gauge")]
-    [SerializeField] private float playerGauge;
-    [SerializeField] private float aiGauge;
-    [SerializeField] private float playerMashPower = 5f;
+    [SerializeField] private float contestBalance;
+    [SerializeField, Range(0f, 100f)] private float playerStress;
+    [SerializeField, Range(0f, 100f)] private float aiStress;
+    [SerializeField] private float playerMashPower = 10f;
     [SerializeField] private float aiPowerPerSecond = 18f;
     [SerializeField] private float maxGauge = 100f;
+    [SerializeField] private GameObject[] fishVariants;
+    [SerializeField] private float nextRoundDelay = 1f;
 
     [Header("AI Catch")]
     [SerializeField] private EnemyStageIntro enemyIntro;
     [SerializeField] private Transform fishMoveTarget;
     [SerializeField] private Transform fishFocusPoint;
     [SerializeField] private Vector3 fishLineOffset = Vector3.zero;
-    [SerializeField] private float liftTime = 1f;
     [SerializeField] private float liftDistance = 5f;
     [SerializeField] private float liftAngle = 60f;
     [SerializeField] private float glowDuration = 3f;
+    [SerializeField] private Vector2 countdownStepRange = new Vector2(0.28f, 0.42f);
 
     [Header("Player Fishing")]
     [SerializeField] private Animator playerAnimator;
     [SerializeField] private GameObject playerFishingRod;
     [SerializeField] private Transform playerRodSocket;
+    [SerializeField] private Vector3 playerRodGripLocalPosition = new Vector3(0.23f, -3.55f, -1.9f);
     [SerializeField] private Transform playerLineStartPoint;
     [SerializeField] private float playerHookDelay = 0.8f;
     [SerializeField] private float fishFocusDelay = 1f;
@@ -65,14 +63,24 @@ public partial class FishTargetNew : MonoBehaviour
     [SerializeField] private float fishingLineWidth = 0.02f;
 
     [Header("Gauge UI")]
+    [SerializeField] private RectTransform canvasRect;
+    [SerializeField] private GameObject dimmerRoot;
+    [SerializeField] private RectTransform[] dimmerPanels;
     [SerializeField] private GameObject gaugeRoot;
-    [SerializeField] private Slider playerGaugeSlider;
-    [SerializeField] private Slider aiGaugeSlider;
+    [SerializeField] private RectTransform tugMarker;
+    [SerializeField] private Image playerSideFill;
+    [SerializeField] private Image aiSideFill;
+    [SerializeField] private GameObject stressRoot;
+    [SerializeField] private Image playerStressFill;
+    [SerializeField] private Image aiStressFill;
+    [SerializeField] private Text countdownText;
+    [SerializeField] private GameObject gameOverRoot;
+    [SerializeField] private float markerTravel = 210f;
 
     [Header("Fish Visual")]
     [Range(0f, 1f)]
     [SerializeField] private float idleSaturation = 0.08f;
-    [SerializeField] private float glowPower = 2f;
+    [SerializeField] private float glowPower = 0.5f;
     [SerializeField] private float fishWiggleScale = 1.18f;
     [SerializeField] private float fishWiggleDistance = 0.35f;
     [SerializeField] private float fishWiggleTime = 0.14f;
@@ -80,7 +88,6 @@ public partial class FishTargetNew : MonoBehaviour
     [SerializeField] private bool debugLog = true;
 
     private float hookStartTime;
-    private float contestTimer;
     private bool isInitialized;
     private Renderer fishRenderer;
     private Transform aiLineStartPoint;
@@ -89,15 +96,17 @@ public partial class FishTargetNew : MonoBehaviour
     private Coroutine playerRodSwingCoroutine;
     private float playerHookReactionTime = -1f;
     private bool isFishFocusReady;
+    private bool stageComplete;
+    private Vector3 initialFishPosition;
 
     private FishLineController lineController;
     private FishGaugeUI gaugeUI;
     private FishVisualController visualController;
 
     public bool CanReceivePlayerInput => currentState == FishState.HookedByAI || currentState == FishState.Contest;
-    public float PlayerGauge => playerGauge;
-    public float AIGauge => aiGauge;
-    public float ContestTimer => contestTimer;
+    public float ContestBalance => contestBalance;
+    public float PlayerStress => playerStress;
+    public float AIStress => aiStress;
 
     private void Start()
     {
@@ -129,7 +138,7 @@ public partial class FishTargetNew : MonoBehaviour
         if (playerFishingRod != null && playerFishingRod.activeSelf && playerRodSocket != null)
         {
             Transform rod = playerFishingRod.transform;
-            rod.position = playerRodSocket.position;
+            rod.position = playerRodSocket.TransformPoint(playerRodGripLocalPosition);
             Vector3 direction = GetFishPosition() - rod.position;
             if (direction.sqrMagnitude > 0.01f) rod.rotation = Quaternion.LookRotation(direction, Vector3.up);
         }
@@ -146,6 +155,16 @@ public partial class FishTargetNew : MonoBehaviour
         }
 
         aiLineStartPoint = startPoint;
+        if (stageComplete)
+        {
+            stageComplete = false;
+            gaugeUI.HideGameOver();
+            playerStress = 0f;
+            aiStress = 0f;
+            gaugeUI.UpdateStress(playerStress, aiStress);
+        }
+        gaugeUI.ShowStress();
+        ChooseRandomFish();
 
         if (aiCatchCoroutine != null)
         {
@@ -182,20 +201,39 @@ public partial class FishTargetNew : MonoBehaviour
         }
 
         playerHookReactionTime = Time.time - hookStartTime;
+        if (playerHookReactionTime > goodTime)
+        {
+            contestBalance = -maxGauge;
+            FinishContest();
+            return;
+        }
         gaugeUI.ClearArrival();
+        visualController.RestoreOriginal();
         MoveToFishFocusCamera();
+        visualController.PlayWiggle();
+        gaugeUI.ShowParryResult(playerHookReactionTime <= perfectTime ? "PERFECT!" : "PARRY!");
+        StartCoroutine(ParryHitStop());
         hookByPlayerCoroutine = StartCoroutine(HookByPlayerCoroutine());
+    }
+
+    private System.Collections.IEnumerator ParryHitStop()
+    {
+        float previousScale = Time.timeScale;
+        Time.timeScale = Mathf.Max(0.05f, previousScale * 0.12f);
+        yield return new WaitForSecondsRealtime(0.07f);
+        Time.timeScale = previousScale;
     }
 
     private void AddPlayerMashGauge()
     {
-        playerGauge = Mathf.Clamp(playerGauge + playerMashPower, 0f, maxGauge);
+        contestBalance = Mathf.Clamp(contestBalance + playerMashPower, -maxGauge, maxGauge);
         visualController.PlayWiggle();
-        gaugeUI.UpdateGauge(playerGauge, aiGauge);
+        gaugeUI.UpdateGauge(contestBalance, maxGauge);
+        if (contestBalance >= maxGauge) FinishContest();
 
         if (debugLog)
         {
-            Debug.Log($"{name}: F 연타 / Player {playerGauge:0} / AI {aiGauge:0}");
+            Debug.Log($"{name}: F 연타 / 줄다리기 {contestBalance:0}");
         }
     }
 

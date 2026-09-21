@@ -7,9 +7,7 @@ public partial class FishTargetNew
         currentState = FishState.Idle;
         isFishFocusReady = false;
         playerHookReactionTime = -1f;
-        playerGauge = 0f;
-        aiGauge = 0f;
-        contestTimer = 0f;
+        contestBalance = 0f;
 
         visualController.SetIdle();
         lineController.HideAll();
@@ -27,7 +25,8 @@ public partial class FishTargetNew
         isFishFocusReady = false;
         hookStartTime = Time.time;
         visualController.SetGlow();
-        gaugeUI.ShowArrival();
+        gaugeUI.ShowArrival(fishRenderer);
+        gaugeUI.ShowParryCue();
 
         if (debugLog)
         {
@@ -44,56 +43,49 @@ public partial class FishTargetNew
 
         if (reactionTime <= perfectTime)
         {
-            playerGauge = perfectBonus;
+            contestBalance = perfectBonus;
             timingName = "Perfect";
         }
         else if (reactionTime <= goodTime)
         {
-            playerGauge = goodBonus;
+            contestBalance = goodBonus;
             timingName = "Good";
-        }
-        else if (reactionTime <= normalTime)
-        {
-            playerGauge = normalBonus;
-            timingName = "Normal";
         }
         else
         {
-            playerGauge = lateBonus;
-            timingName = "Late";
+            contestBalance = goodBonus;
+            timingName = "Good";
         }
 
-        aiGauge = 0f;
-        contestTimer = contestDuration;
         currentState = FishState.Contest;
 
         gaugeUI.ClearArrival();
+        gaugeUI.HideCountdown();
         MoveToFishFocusCamera();
-        gaugeUI.Show(playerGauge, aiGauge);
+        gaugeUI.Show(contestBalance, maxGauge);
 
         if (debugLog)
         {
-            Debug.Log($"{name}: {timingName} / 반응 시간 {reactionTime:0.00}초 / 시작 보너스 {playerGauge:0}");
+            Debug.Log($"{name}: {timingName} / 반응 시간 {reactionTime:0.00}초 / 시작 위치 {contestBalance:0}");
         }
     }
 
     private void UpdateContest()
     {
-        contestTimer -= Time.deltaTime;
-        aiGauge = Mathf.Clamp(aiGauge + aiPowerPerSecond * Time.deltaTime, 0f, maxGauge);
-
-        gaugeUI.UpdateGauge(playerGauge, aiGauge);
-
-        if (contestTimer <= 0f || playerGauge >= maxGauge || aiGauge >= maxGauge)
-        {
-            FinishContest();
-        }
+        contestBalance = Mathf.Clamp(contestBalance - aiPowerPerSecond * Time.deltaTime, -maxGauge, maxGauge);
+        gaugeUI.UpdateGauge(contestBalance, maxGauge);
+        if (contestBalance <= -maxGauge || contestBalance >= maxGauge) FinishContest();
     }
 
     private void FinishContest()
     {
-        bool playerWin = playerGauge >= aiGauge;
+        bool playerWin = contestBalance >= maxGauge;
         currentState = playerWin ? FishState.PlayerWin : FishState.AIWin;
+        if (playerWin) aiStress = Mathf.Min(100f, aiStress + 25f);
+        else playerStress = Mathf.Min(100f, playerStress + 25f);
+        gaugeUI.UpdateStress(playerStress, aiStress);
+        CharacterDamageFlash.Play(playerWin ? enemyIntro != null ? enemyIntro.transform : null :
+            playerAnimator != null ? playerAnimator.transform : null);
 
         visualController.RestoreOriginal();
         lineController.HideAll();
@@ -102,7 +94,7 @@ public partial class FishTargetNew
         if (debugLog)
         {
             string result = playerWin ? "플레이어 승리, 물고기 훔치기 성공" : "AI 승리, 물고기를 빼앗지 못함";
-            Debug.Log($"{name}: 대결 종료 / Player {playerGauge:0} / AI {aiGauge:0} / {result}");
+            Debug.Log($"{name}: 대결 종료 / 줄다리기 {contestBalance:0} / Player Stress {playerStress:0}% / AI Stress {aiStress:0}% / {result}");
         }
 
         StartCoroutine(MoveFishToWinner(playerWin));
