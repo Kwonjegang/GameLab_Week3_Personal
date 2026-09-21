@@ -50,6 +50,7 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private CinemachineCamera followCamera;
     [SerializeField] private CinemachineCamera stageCamera;
+    [SerializeField] private EnemyStageIntro enemyIntro;
 
     private bool isUsingSunbed;
     public bool isStageStarted;
@@ -322,6 +323,11 @@ public class PlayerController : MonoBehaviour
         transform.rotation = endRotation;
 
         isStageStarted = true;
+
+        if (enemyIntro != null)
+        {
+            enemyIntro.PlayIntro();
+        }
     }
     IEnumerator DashCoroutine()
     {

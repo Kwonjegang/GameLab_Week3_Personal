@@ -7,9 +7,16 @@ using UnityEngine.Rendering;
 
 public class EnemyStageIntro : MonoBehaviour
 {
+    [Header("Move Points")]
     [SerializeField] private Transform moveTarget;
-    [SerializeField] private float fadeTime = 1f;
+    [SerializeField] private Transform liePoint;
+
+    [Header("Move Setting")]
     [SerializeField] private float moveSpeed = 3f;
+    [SerializeField] private float jumpMoveTime = 1.2f;
+    [SerializeField] private float jumpHeight = 2f;
+    [SerializeField] private float fadeTime = 1f;
+    [SerializeField] private float sitTriggerRatio = 0.5f;
     [SerializeField] private string walkBoolName = "IsWalking";
 
     private Renderer[] renderers;
@@ -37,10 +44,9 @@ public class EnemyStageIntro : MonoBehaviour
     }
     private void Start()
     {
-        PlayIntro();
     }
 
-    void PlayIntro()
+    public void PlayIntro()
     {
         if (isPlaying)
         {
@@ -81,11 +87,14 @@ public class EnemyStageIntro : MonoBehaviour
     {
         isPlaying = true;
 
-        if (animator != null && !string.IsNullOrEmpty(walkBoolName))
-        {
-            animator.SetBool(walkBoolName, true);
-        }
+        yield return StartCoroutine(FadeInCoroutine());
+        yield return StartCoroutine(WalkToTargetPointCoroutine());
+        yield return StartCoroutine(JumpToLiePointCoroutine());
+        yield return StartCoroutine(SwingFishRobCoroutine());
+    }
 
+    IEnumerator FadeInCoroutine()
+    {
         float timer = 0f;
 
         while (timer < fadeTime)
@@ -99,11 +108,25 @@ public class EnemyStageIntro : MonoBehaviour
         }
 
         SetAlpha(1f);
+    }
+    IEnumerator WalkToTargetPointCoroutine()
+    {
+        if (animator != null && !string.IsNullOrEmpty(walkBoolName))
+        {
+            animator.SetBool(walkBoolName, true);
+        }
 
         while (moveTarget != null && Vector3.Distance(transform.position, moveTarget.position) > 0.1f)
         {
             Vector3 targetPosition = moveTarget.position;
             targetPosition.y = transform.position.y;
+
+            float distance = Vector3.Distance(transform.position, targetPosition);
+
+            if (distance <= 0.1f)
+            {
+                break;
+            }
 
             transform.position = Vector3.MoveTowards(transform.position, targetPosition, moveSpeed * Time.deltaTime);
 
@@ -116,10 +139,74 @@ public class EnemyStageIntro : MonoBehaviour
 
             yield return null;
         }
+        if (moveTarget != null)
+        {
+            Vector3 finalPosition = moveTarget.position;
+            finalPosition.y = transform.position.y;
+            transform.position = finalPosition;
+        }
 
         if (animator != null && !string.IsNullOrEmpty(walkBoolName))
         {
             animator.SetBool(walkBoolName, false);
         }
+    }
+    IEnumerator JumpToLiePointCoroutine()
+    {
+        if (liePoint == null)
+        {
+            yield break;
+        }
+
+        if (animator != null)
+        {
+            animator.SetTrigger("Jump");
+        }
+
+        Vector3 startPosition = transform.position;
+        Vector3 endPosition = liePoint.position;
+
+        Quaternion startRotation = transform.rotation;
+        Quaternion endRotation = Quaternion.Euler(0f, liePoint.eulerAngles.y, 0f);
+
+        float timer = 0f;
+        bool sitStarted = false;
+
+        while (timer < jumpMoveTime)
+        {
+            timer += Time.deltaTime;
+
+            float t = Mathf.Clamp01(timer / jumpMoveTime);
+
+            Vector3 nextPosition = Vector3.Lerp(startPosition, endPosition, t);
+            nextPosition.y += Mathf.Sin(t * Mathf.PI) * jumpHeight;
+
+            transform.position = nextPosition;
+            transform.rotation = Quaternion.Slerp(startRotation, endRotation, t);
+
+            if (!sitStarted && t >= sitTriggerRatio)
+            {
+                sitStarted = true;
+
+                if (animator != null)
+                {
+                    animator.SetTrigger("SunbedSit");
+                }
+            }
+
+            yield return null;
+        }
+
+        transform.position = endPosition;
+        transform.rotation = endRotation;
+    }
+    IEnumerator SwingFishRobCoroutine()
+    {
+        if (animator != null)
+        {
+            yield return new WaitForSeconds(3f);
+            animator.SetTrigger("Swing");
+        }
+        yield return null;
     }
 }
