@@ -25,9 +25,7 @@ public class PlayerFishProgress : MonoBehaviour
 
     private void Update()
     {
-        if (ui == null || gameOver || player == null) return;
-        if (player.IsInWater || player.isStageStarted) ui.ShowStress();
-        else ui.HideStress();
+        if (ui != null) ui.ShowStress();
     }
 
     public void AddFish(int value, int count = 1)

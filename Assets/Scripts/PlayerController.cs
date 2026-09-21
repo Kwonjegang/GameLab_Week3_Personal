@@ -40,8 +40,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float minCameraPitch = -10f;
     [SerializeField] private float maxCameraPitch = 75f;
     [SerializeField] private Transform playerVisual;
-    [SerializeField] private float backwardCameraYaw = 12f;
-    [SerializeField] private float backwardCameraFov = 64f;
 
     [Header("Water")]
     [SerializeField] private Transform waterSurface;
@@ -71,7 +69,6 @@ public class PlayerController : MonoBehaviour
     private float dashTime = 1f;
     private float freeLookYaw;
     private float cameraPitch;
-    private float defaultCameraFov;
     private float backwardBlend;
     private Quaternion visualReadyRotation;
     private bool isBackwardRunning;
@@ -107,7 +104,6 @@ public class PlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         playerAnimator = GetComponent<Animator>();
         if (playerVisual != null) visualReadyRotation = playerVisual.localRotation;
-        if (followCamera != null) defaultCameraFov = followCamera.Lens.FieldOfView;
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -264,8 +260,6 @@ public class PlayerController : MonoBehaviour
         if (playerVisual != null)
             playerVisual.localRotation = Quaternion.Slerp(visualReadyRotation,
                 visualReadyRotation * Quaternion.Euler(0f, 180f, 0f), backwardBlend);
-        if (followCamera != null)
-            followCamera.Lens.FieldOfView = Mathf.Lerp(defaultCameraFov, backwardCameraFov, backwardBlend);
     }
     public void Dash()
     {
@@ -300,7 +294,7 @@ public class PlayerController : MonoBehaviour
 
             if (orbitalFollow != null)
             {
-                orbitalFollow.HorizontalAxis.Value = freeLookYaw + backwardCameraYaw * backwardBlend;
+                orbitalFollow.HorizontalAxis.Value = freeLookYaw;
             }
 
             return;
@@ -311,7 +305,7 @@ public class PlayerController : MonoBehaviour
         if (orbitalFollow != null)
         {
             freeLookYaw = Mathf.LerpAngle(freeLookYaw, 0f, Time.deltaTime * freeLookReturnSpeed);
-            orbitalFollow.HorizontalAxis.Value = freeLookYaw + backwardCameraYaw * backwardBlend;
+            orbitalFollow.HorizontalAxis.Value = freeLookYaw;
         }
     }
     void CheckSunbedInteraction()
@@ -477,7 +471,6 @@ public class PlayerController : MonoBehaviour
         controller.enabled = true;
         stageCamera.gameObject.SetActive(false);
         if (followCamera != null) followCamera.gameObject.SetActive(true);
-        if (followCamera != null) followCamera.Lens.FieldOfView = defaultCameraFov;
         if (gameOver)
         {
             isGameOver = true;

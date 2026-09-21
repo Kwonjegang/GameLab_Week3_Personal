@@ -9,6 +9,7 @@ public class UnderwaterFishSpawner : MonoBehaviour
     [SerializeField] private Vector2 spawnDelay = new Vector2(1.5f, 3f);
     [SerializeField] private Vector2 spawnDistance = new Vector2(30f, 48f);
     [SerializeField] private float underwaterDepth = 7f;
+    [SerializeField] private Vector3 fishHeadForwardOffset;
 
     private UnderwaterFishAttack activeFish;
     private float nextSpawnTime;
@@ -48,7 +49,8 @@ public class UnderwaterFishSpawner : MonoBehaviour
         fish.transform.localScale = fishPrefabs[index].transform.localScale * 3f;
         activeFish = fish.AddComponent<UnderwaterFishAttack>();
         activeFish.Initialize(player, progress, this, index,
-            waterSurface != null ? waterSurface.position.y : player.transform.position.y + 2f);
+            waterSurface != null ? waterSurface.position.y : player.transform.position.y + 2f,
+            fishHeadForwardOffset);
     }
 
     public bool TryParry()

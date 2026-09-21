@@ -34,7 +34,7 @@ public partial class FishTargetNew
 
         gaugeUI.Configure(canvasRect, dimmerRoot, dimmerPanels, gaugeRoot, tugMarker,
             playerSideFill, aiSideFill, stressRoot, playerStressFill, aiStressFill, countdownText,
-            gameOverRoot, rewardChoiceRoot, inventoryText, markerTravel);
+            gameOverRoot, rewardResultRoot, inventoryText, markerTravel);
         gaugeUI.Initialize();
         gaugeUI.Hide();
 

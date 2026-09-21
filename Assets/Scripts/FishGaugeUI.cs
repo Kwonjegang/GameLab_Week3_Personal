@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
+using System.Text.RegularExpressions;
 
 public class FishGaugeUI : MonoBehaviour
 {
@@ -14,8 +16,17 @@ public class FishGaugeUI : MonoBehaviour
     [SerializeField] private GameObject stressRoot;
     [SerializeField] private Text countdownText;
     [SerializeField] private GameObject gameOverRoot;
-    [SerializeField] private GameObject rewardChoiceRoot;
+    [SerializeField] private GameObject rewardResultRoot;
+    [SerializeField] private Text rewardResultText;
     [SerializeField] private Text inventoryText;
+    [SerializeField] private Text inventory500Text;
+    [SerializeField] private Text inventory1000Text;
+    [SerializeField] private Text inventory1500Text;
+    [SerializeField] private Text inventoryTotalText;
+    private TMP_Text inventory500TMP;
+    private TMP_Text inventory1000TMP;
+    private TMP_Text inventory1500TMP;
+    private TMP_Text inventoryTotalTMP;
     [SerializeField] private Text contestHint;
     [SerializeField] private Image playerStressFill;
     [SerializeField] private Image aiStressFill;
@@ -27,7 +38,7 @@ public class FishGaugeUI : MonoBehaviour
     public void Configure(RectTransform canvas, GameObject dimmer, RectTransform[] panels,
         GameObject gauge, RectTransform marker, Image playerFill, Image aiFill,
         GameObject stressPanel, Image playerStress, Image aiStress, Text countdown, GameObject gameOver,
-        GameObject rewardChoices, Text inventory, float travel)
+        GameObject rewardResult, Text inventory, float travel)
     {
         if (canvas != null) canvasRect = canvas;
         if (dimmer != null) dimmerRoot = dimmer;
@@ -41,7 +52,7 @@ public class FishGaugeUI : MonoBehaviour
         if (aiStress != null) aiStressFill = aiStress;
         if (countdown != null) countdownText = countdown;
         if (gameOver != null) gameOverRoot = gameOver;
-        if (rewardChoices != null) rewardChoiceRoot = rewardChoices;
+        if (rewardResult != null) rewardResultRoot = rewardResult;
         if (inventory != null) inventoryText = inventory;
         markerTravel = travel;
     }
@@ -60,7 +71,7 @@ public class FishGaugeUI : MonoBehaviour
         HideCountdown();
         if (stressRoot != null) stressRoot.SetActive(false);
         HideGameOver();
-        HideRewardChoices();
+        HideRewardResult();
     }
 
     public void ShowCountdown(int number)
@@ -115,20 +126,55 @@ public class FishGaugeUI : MonoBehaviour
         if (gameOverRoot != null) gameOverRoot.SetActive(false);
     }
 
-    public void ShowRewardChoices()
+    public void ShowRewardResult(int value, int count)
     {
-        if (rewardChoiceRoot != null) rewardChoiceRoot.SetActive(true);
+        if (rewardResultText != null) rewardResultText.text = $"REWARD!\n{value} x {count}\nSTRESS -35%";
+        if (rewardResultRoot != null) rewardResultRoot.SetActive(true);
     }
 
-    public void HideRewardChoices()
+    public void HideRewardResult()
     {
-        if (rewardChoiceRoot != null) rewardChoiceRoot.SetActive(false);
+        if (rewardResultRoot != null) rewardResultRoot.SetActive(false);
     }
 
     public void UpdateInventory(int fish500, int fish1000, int fish1500, int totalValue)
     {
-        if (inventoryText != null)
-            inventoryText.text = $"500 x{fish500}   1000 x{fish1000}   1500 x{fish1500}    TOTAL {totalValue}";
+        ResolveInventoryTexts();
+        if (inventory500Text != null) inventory500Text.text = WithCount(inventory500Text.text, fish500);
+        if (inventory1000Text != null) inventory1000Text.text = WithCount(inventory1000Text.text, fish1000);
+        if (inventory1500Text != null) inventory1500Text.text = WithCount(inventory1500Text.text, fish1500);
+        if (inventoryTotalText != null) inventoryTotalText.text = WithCount(inventoryTotalText.text, totalValue);
+        if (inventory500TMP != null) inventory500TMP.text = WithCount(inventory500TMP.text, fish500);
+        if (inventory1000TMP != null) inventory1000TMP.text = WithCount(inventory1000TMP.text, fish1000);
+        if (inventory1500TMP != null) inventory1500TMP.text = WithCount(inventory1500TMP.text, fish1500);
+        if (inventoryTotalTMP != null) inventoryTotalTMP.text = WithCount(inventoryTotalTMP.text, totalValue);
+    }
+
+    private static string WithCount(string current, int value)
+    {
+        if (string.IsNullOrWhiteSpace(current)) return value.ToString();
+        return Regex.IsMatch(current, @"\d+\s*$")
+            ? Regex.Replace(current, @"\d+\s*$", value.ToString())
+            : current + " " + value;
+    }
+
+    private void ResolveInventoryTexts()
+    {
+        if (canvasRect == null) return;
+        foreach (Text label in canvasRect.GetComponentsInChildren<Text>(true))
+        {
+            if (label.name == "FishInventoryHUD_500") inventory500Text = label;
+            else if (label.name == "FishInventoryHUD_1000") inventory1000Text = label;
+            else if (label.name == "FishInventoryHUD_1500") inventory1500Text = label;
+            else if (label.name == "FishInventoryHUD_Total") inventoryTotalText = label;
+        }
+        foreach (TMP_Text label in canvasRect.GetComponentsInChildren<TMP_Text>(true))
+        {
+            if (label.name == "FishInventoryHUD_500") inventory500TMP = label;
+            else if (label.name == "FishInventoryHUD_1000") inventory1000TMP = label;
+            else if (label.name == "FishInventoryHUD_1500") inventory1500TMP = label;
+            else if (label.name == "FishInventoryHUD_Total") inventoryTotalTMP = label;
+        }
     }
 
     public void ShowArrival(Renderer fish)

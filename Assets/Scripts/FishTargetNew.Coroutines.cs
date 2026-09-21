@@ -160,14 +160,22 @@ public partial class FishTargetNew
         visualController.RestoreOriginal();
         if (playerWin && (playerProgress == null || !playerProgress.IsGameOver))
         {
-            awaitingRewardChoice = true;
-            gaugeUI.ShowRewardChoices();
-            while (awaitingRewardChoice) yield return null;
+            int reward = Random.Range(0, 3);
+            int value = reward == 0 ? 500 : reward == 1 ? 1000 : 1500;
+            int count = reward == 2 ? 2 : 3;
+            if (playerProgress != null)
+            {
+                playerProgress.AddFish(value, count);
+                playerProgress.ChangeStress(-35f);
+            }
+            gaugeUI.ShowRewardResult(value, count);
+            yield return new WaitForSeconds(1.1f);
+            gaugeUI.HideRewardResult();
         }
         if (roundsCompleted >= 4 || (playerProgress != null && playerProgress.IsGameOver))
         {
             stageComplete = true;
-            gaugeUI.HideRewardChoices();
+            gaugeUI.HideRewardResult();
             if (playerFishingRod != null) playerFishingRod.SetActive(false);
             if (enemyIntro != null) enemyIntro.ResetStage();
             PlayerController player = playerAnimator != null ? playerAnimator.GetComponent<PlayerController>() : null;

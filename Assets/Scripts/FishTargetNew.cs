@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.InputSystem;
 
 public partial class FishTargetNew : MonoBehaviour
 {
@@ -76,7 +75,7 @@ public partial class FishTargetNew : MonoBehaviour
     [SerializeField] private Image aiStressFill;
     [SerializeField] private Text countdownText;
     [SerializeField] private GameObject gameOverRoot;
-    [SerializeField] private GameObject rewardChoiceRoot;
+    [SerializeField] private GameObject rewardResultRoot;
     [SerializeField] private Text inventoryText;
     [SerializeField] private PlayerFishProgress playerProgress;
     [SerializeField] private float markerTravel = 210f;
@@ -102,7 +101,6 @@ public partial class FishTargetNew : MonoBehaviour
     private bool isFishFocusReady;
     private bool stageComplete;
     private int roundsCompleted;
-    private bool awaitingRewardChoice;
     private Vector3 initialFishPosition;
 
     private FishLineController lineController;
@@ -134,13 +132,6 @@ public partial class FishTargetNew : MonoBehaviour
         if (currentState == FishState.Contest)
         {
             UpdateContest();
-        }
-
-        if (awaitingRewardChoice && Keyboard.current != null)
-        {
-            if (Keyboard.current.digit1Key.wasPressedThisFrame || Keyboard.current.numpad1Key.wasPressedThisFrame) SelectReward(500, 3);
-            else if (Keyboard.current.digit2Key.wasPressedThisFrame || Keyboard.current.numpad2Key.wasPressedThisFrame) SelectReward(1000, 3);
-            else if (Keyboard.current.digit3Key.wasPressedThisFrame || Keyboard.current.numpad3Key.wasPressedThisFrame) SelectReward(1500, 2);
         }
 
         UpdateFishingLines();
@@ -192,17 +183,6 @@ public partial class FishTargetNew : MonoBehaviour
         enemyIntro = intro;
     }
 
-    private void SelectReward(int value, int count)
-    {
-        if (!awaitingRewardChoice) return;
-        if (playerProgress != null)
-        {
-            playerProgress.AddFish(value, count);
-            playerProgress.ChangeStress(-35f);
-        }
-        gaugeUI.HideRewardChoices();
-        awaitingRewardChoice = false;
-    }
 
     public void PressF()
     {
