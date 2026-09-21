@@ -40,7 +40,7 @@ public class FishSteelController : MonoBehaviour
 
     private void TryPressF()
     {
-        FishTarget fish = FindNearestFish();
+        FishTargetNew fish = FindNearestFish();
 
         if (fish == null)
         {
@@ -55,14 +55,14 @@ public class FishSteelController : MonoBehaviour
         fish.PressF();
     }
 
-    private FishTarget FindNearestFish()
+    private FishTargetNew FindNearestFish()
     {
-        FishTarget[] fishes = FindObjectsByType<FishTarget>(FindObjectsSortMode.None);
+        FishTargetNew[] fishes = FindObjectsByType<FishTargetNew>(FindObjectsSortMode.None);
 
-        FishTarget nearestFish = null;
+        FishTargetNew nearestFish = null;
         float nearestDistance = stealRange;
 
-        foreach (FishTarget fish in fishes)
+        foreach (FishTargetNew fish in fishes)
         {
             if (fish == null || !fish.CanReceivePlayerInput)
             {

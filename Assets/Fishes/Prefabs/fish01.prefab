@@ -12,7 +12,6 @@ GameObject:
   - component: {fileID: 6309824577262034217}
   - component: {fileID: 7440619239557229572}
   - component: {fileID: 478918112901100001}
-  - component: {fileID: 478918112901100002}
   m_Layer: 0
   m_Name: fish01
   m_TagString: Untagged
@@ -112,23 +111,3 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.4, y: 3, z: 2}
   m_Center: {x: 0.06, y: -2.39, z: -1.53}
---- !u!114 &478918112901100002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7660056815385157646}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e1c7427212b83b4488092b273307176b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  autoHookOnStart: 1
-  autoHookDelay: 3
-  requiredStealGauge: 100
-  stolenHideDelay: 0.5
-  idleSaturation: 0.08
-  glowIntensity: 1.8
-  debugLog: 1
-

@@ -19,6 +19,29 @@ public class EnemyStageIntro : MonoBehaviour
     [SerializeField] private float sitTriggerRatio = 0.5f;
     [SerializeField] private string walkBoolName = "IsWalking";
 
+    [Header("Camera Switch")]
+    [SerializeField] private CinemachineCamera stageCamera;
+    [SerializeField] private CinemachineCamera AIFishGetCamera;
+    [SerializeField] private CinemachineCamera FishFocusCamera;
+
+    [Header("Fishing Rod")]
+    [SerializeField] private GameObject fishingRodPrefab;
+    [SerializeField] private Transform fishingRodSocket;
+
+    [Header("Fishing Line")]
+    [SerializeField] private Vector3 fishingLineStartLocalPosition = new Vector3(0f, 0f, 1.5f);
+
+    [Header("Fishing Rod Swing")]
+    [SerializeField] private Vector3 rodReadyRotation = new Vector3(135f, 3.5f, 180f);
+    [SerializeField] private Vector3 rodSwingRotation = new Vector3(80f, 3.5f, 160f);
+    [SerializeField] private float rodSwingTime = 0.35f;
+
+    [Header("Fish Lift")]
+    [SerializeField] private FishTargetNew targetFish;
+    [SerializeField] private float fishLiftDelay = 1.5f;
+
+    private GameObject spawnedFisingRod;
+    private Transform fishingLineStartPoint;
     private Renderer[] renderers;
     private Material[] materials;
     private Animator animator;
@@ -42,10 +65,6 @@ public class EnemyStageIntro : MonoBehaviour
         materials = materialList.ToArray();
         SetAlpha(0f);
     }
-    private void Start()
-    {
-    }
-
     public void PlayIntro()
     {
         if (isPlaying)
@@ -54,6 +73,41 @@ public class EnemyStageIntro : MonoBehaviour
         }
         gameObject.SetActive(true);
         StartCoroutine(IntroCoroutine());
+    }
+    void SpawnFishingRod()
+    {
+        if (spawnedFisingRod != null)
+        {
+            return;
+        }
+
+        if (fishingRodPrefab == null || fishingRodSocket == null)
+        {
+            Debug.Log("낚싯대 프리팹 또는 손 소켓이 연결되지 않았습니다.");
+            return;
+        }
+
+        spawnedFisingRod = Instantiate(fishingRodPrefab, fishingRodSocket);
+
+        spawnedFisingRod.transform.localPosition = new Vector3(1.32f, 0f, -4f);
+        spawnedFisingRod.transform.localRotation = Quaternion.Euler(rodReadyRotation);
+        spawnedFisingRod.transform.localScale = new Vector3(3f, 3f, 3f);
+
+        CreateFishingLineStartPoint();
+    }
+    void CreateFishingLineStartPoint()
+    {
+        if (spawnedFisingRod == null || fishingLineStartPoint != null)
+        {
+            return;
+        }
+
+        GameObject linePointObject = new GameObject("FishingLineStartPoint");
+        fishingLineStartPoint = linePointObject.transform;
+        fishingLineStartPoint.SetParent(spawnedFisingRod.transform, false);
+        fishingLineStartPoint.localPosition = fishingLineStartLocalPosition;
+        fishingLineStartPoint.localRotation = Quaternion.identity;
+        fishingLineStartPoint.localScale = Vector3.one;
     }
     void SetAlpha(float alpha)
     {
@@ -82,6 +136,24 @@ public class EnemyStageIntro : MonoBehaviour
         material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
         material.renderQueue = (int)RenderQueue.Transparent;
     }
+    public void SwitchToFishFocusCamera()
+    {
+        CinemachineBrain brain = Camera.main != null ? Camera.main.GetComponent<CinemachineBrain>() : null;
+        if (brain != null)
+        {
+            StartCoroutine(RestoreBlendAfterFocus(brain, brain.DefaultBlend));
+            brain.DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Styles.EaseInOut, 0.45f);
+        }
+        stageCamera.gameObject.SetActive(false);
+        AIFishGetCamera.gameObject.SetActive(false);
+        FishFocusCamera.gameObject.SetActive(true);
+    }
+
+    private IEnumerator RestoreBlendAfterFocus(CinemachineBrain brain, CinemachineBlendDefinition previous)
+    {
+        yield return new WaitForSeconds(0.5f);
+        if (brain != null) brain.DefaultBlend = previous;
+    }
 
     IEnumerator IntroCoroutine()
     {
@@ -90,7 +162,7 @@ public class EnemyStageIntro : MonoBehaviour
         yield return StartCoroutine(FadeInCoroutine());
         yield return StartCoroutine(WalkToTargetPointCoroutine());
         yield return StartCoroutine(JumpToLiePointCoroutine());
-        yield return StartCoroutine(SwingFishRobCoroutine());
+        yield return StartCoroutine(SwingFishRodCoroutine());
     }
 
     IEnumerator FadeInCoroutine()
@@ -200,13 +272,63 @@ public class EnemyStageIntro : MonoBehaviour
         transform.position = endPosition;
         transform.rotation = endRotation;
     }
-    IEnumerator SwingFishRobCoroutine()
+    IEnumerator SwingFishingCoroutine()
     {
+        if (spawnedFisingRod == null)
+        {
+            yield break;
+        }
+
+        Quaternion readyRotation = Quaternion.Euler(rodReadyRotation);
+        Quaternion swingRotation = Quaternion.Euler(rodSwingRotation);
+
+        float timer = 0f;
+
+        while (timer < rodSwingTime)
+        {
+            timer += Time.deltaTime;
+
+            float t = Mathf.Clamp01(timer / rodSwingTime);
+            spawnedFisingRod.transform.localRotation = Quaternion.Slerp(readyRotation, swingRotation, t);
+            yield return null;
+        }
+        timer = 0f;
+
+        while (timer < rodSwingTime)
+        {
+            timer += Time.deltaTime;
+
+            float t = Mathf.Clamp01(timer / rodSwingTime);
+                
+            spawnedFisingRod.transform.localRotation = Quaternion.Slerp(swingRotation, readyRotation, t);
+            yield return null;
+        }
+        spawnedFisingRod.transform.localRotation = readyRotation;
+    }
+    IEnumerator SwingFishRodCoroutine()
+    {
+        yield return new WaitForSeconds(3f);
+
+        stageCamera.gameObject.SetActive(false);
+        AIFishGetCamera.gameObject.SetActive(true);
+
+        SpawnFishingRod();
+
         if (animator != null)
         {
-            yield return new WaitForSeconds(3f);
             animator.SetTrigger("Swing");
         }
-        yield return null;
+        StartCoroutine(SwingFishingCoroutine());
+
+        yield return new WaitForSeconds(fishLiftDelay);
+
+        if (targetFish != null)
+        {
+            Transform lineStartPoint = fishingLineStartPoint != null ? fishingLineStartPoint : fishingRodSocket;
+            targetFish.SetEnemyIntro(this);
+            targetFish.StartAICatch(lineStartPoint);
+        }
     }
 }
+    
+
