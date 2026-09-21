@@ -14,6 +14,9 @@ public class FishGaugeUI : MonoBehaviour
     [SerializeField] private GameObject stressRoot;
     [SerializeField] private Text countdownText;
     [SerializeField] private GameObject gameOverRoot;
+    [SerializeField] private GameObject rewardChoiceRoot;
+    [SerializeField] private Text inventoryText;
+    [SerializeField] private Text contestHint;
     [SerializeField] private Image playerStressFill;
     [SerializeField] private Image aiStressFill;
     [SerializeField] private float markerTravel = 210f;
@@ -23,7 +26,8 @@ public class FishGaugeUI : MonoBehaviour
 
     public void Configure(RectTransform canvas, GameObject dimmer, RectTransform[] panels,
         GameObject gauge, RectTransform marker, Image playerFill, Image aiFill,
-        GameObject stressPanel, Image playerStress, Image aiStress, Text countdown, GameObject gameOver, float travel)
+        GameObject stressPanel, Image playerStress, Image aiStress, Text countdown, GameObject gameOver,
+        GameObject rewardChoices, Text inventory, float travel)
     {
         if (canvas != null) canvasRect = canvas;
         if (dimmer != null) dimmerRoot = dimmer;
@@ -37,6 +41,8 @@ public class FishGaugeUI : MonoBehaviour
         if (aiStress != null) aiStressFill = aiStress;
         if (countdown != null) countdownText = countdown;
         if (gameOver != null) gameOverRoot = gameOver;
+        if (rewardChoices != null) rewardChoiceRoot = rewardChoices;
+        if (inventory != null) inventoryText = inventory;
         markerTravel = travel;
     }
 
@@ -54,6 +60,7 @@ public class FishGaugeUI : MonoBehaviour
         HideCountdown();
         if (stressRoot != null) stressRoot.SetActive(false);
         HideGameOver();
+        HideRewardChoices();
     }
 
     public void ShowCountdown(int number)
@@ -108,6 +115,22 @@ public class FishGaugeUI : MonoBehaviour
         if (gameOverRoot != null) gameOverRoot.SetActive(false);
     }
 
+    public void ShowRewardChoices()
+    {
+        if (rewardChoiceRoot != null) rewardChoiceRoot.SetActive(true);
+    }
+
+    public void HideRewardChoices()
+    {
+        if (rewardChoiceRoot != null) rewardChoiceRoot.SetActive(false);
+    }
+
+    public void UpdateInventory(int fish500, int fish1000, int fish1500, int totalValue)
+    {
+        if (inventoryText != null)
+            inventoryText.text = $"500 x{fish500}   1000 x{fish1000}   1500 x{fish1500}    TOTAL {totalValue}";
+    }
+
     public void ShowArrival(Renderer fish)
     {
         highlightedFish = fish;
@@ -159,9 +182,10 @@ public class FishGaugeUI : MonoBehaviour
         panel.sizeDelta = new Vector2(width, height);
     }
 
-    public void Show(float balance, float maximum)
+    public void Show(float balance, float maximum, int round = 0)
     {
         if (gaugeRoot != null) gaugeRoot.SetActive(true);
+        if (contestHint != null && round > 0) contestHint.text = $"ROUND {round}/4   F 연타!";
         UpdateGauge(balance, maximum);
     }
 

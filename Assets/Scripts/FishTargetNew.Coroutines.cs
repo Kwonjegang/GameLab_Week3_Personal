@@ -158,19 +158,20 @@ public partial class FishTargetNew
         }
         SetFishPosition(destination);
         visualController.RestoreOriginal();
-        if (playerStress >= 100f || aiStress >= 100f)
+        if (playerWin && (playerProgress == null || !playerProgress.IsGameOver))
+        {
+            awaitingRewardChoice = true;
+            gaugeUI.ShowRewardChoices();
+            while (awaitingRewardChoice) yield return null;
+        }
+        if (roundsCompleted >= 4 || (playerProgress != null && playerProgress.IsGameOver))
         {
             stageComplete = true;
-            gaugeUI.HideStress();
+            gaugeUI.HideRewardChoices();
             if (playerFishingRod != null) playerFishingRod.SetActive(false);
-            PlayerController player = playerAnimator != null ? playerAnimator.GetComponent<PlayerController>() : null;
-            if (aiStress >= 100f && enemyIntro != null)
-            {
-                enemyIntro.PlayStumble();
-                yield return new WaitForSeconds(1.6f);
-            }
             if (enemyIntro != null) enemyIntro.ResetStage();
-            if (player != null) player.EndStage(playerStress >= 100f, gaugeUI);
+            PlayerController player = playerAnimator != null ? playerAnimator.GetComponent<PlayerController>() : null;
+            if (player != null && (playerProgress == null || !playerProgress.IsGameOver)) player.EndStage(false, gaugeUI);
             if (hideAfterResult) gameObject.SetActive(false);
             yield break;
         }

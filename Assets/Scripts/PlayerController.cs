@@ -81,6 +81,11 @@ public class PlayerController : MonoBehaviour
     private float lastWaterBurstTime = -10f;
     private Vector3 preStagePosition;
     private Quaternion preStageRotation;
+    private bool stageEnding;
+    private Transform stunIcon;
+
+    public bool IsInWater => isInWater;
+    public bool IsGameOver => isGameOver;
 
     InputSystem_Actions inputActions;
     Coroutine dashCoroutine;
@@ -253,6 +258,7 @@ public class PlayerController : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (stunIcon != null && Camera.main != null) stunIcon.rotation = Camera.main.transform.rotation;
         if (isGameOver || isUsingSunbed) return;
         backwardBlend = Mathf.MoveTowards(backwardBlend, isBackwardRunning ? 1f : 0f, Time.deltaTime * 3.5f);
         if (playerVisual != null)
@@ -407,7 +413,50 @@ public class PlayerController : MonoBehaviour
 
     public void EndStage(bool gameOver, FishGaugeUI ui)
     {
+        if (stageEnding || isGameOver) return;
+        stageEnding = true;
         StartCoroutine(EndStageCoroutine(gameOver, ui));
+    }
+
+    public void DrownGameOver(FishGaugeUI ui)
+    {
+        if (isGameOver) return;
+        StartCoroutine(DrownGameOverCoroutine(ui));
+    }
+
+    private IEnumerator DrownGameOverCoroutine(FishGaugeUI ui)
+    {
+        isGameOver = true;
+        isActionLocked = true;
+        moveDirection = Vector3.zero;
+        verticalVelocity = 0f;
+        playerAnimator.SetBool("IsSwimming", false);
+        playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
+        GameObject icon = new GameObject("StunIcon");
+        stunIcon = icon.transform;
+        stunIcon.SetParent(transform, false);
+        stunIcon.localPosition = Vector3.up * 11f;
+        TextMesh label = icon.AddComponent<TextMesh>();
+        label.text = "Zz";
+        label.fontSize = 72;
+        label.characterSize = 0.18f;
+        label.anchor = TextAnchor.MiddleCenter;
+        label.color = new Color(1f, 0.9f, 0.35f);
+        yield return new WaitForSeconds(0.75f);
+        controller.enabled = false;
+        float elapsed = 0f;
+        while (elapsed < 2f)
+        {
+            elapsed += Time.deltaTime;
+            transform.position += Vector3.down * 4f * Time.deltaTime;
+            yield return null;
+        }
+        if (ui != null) ui.ShowGameOver();
+    }
+
+    private void OnDestroy()
+    {
+        if (stunIcon != null) Destroy(stunIcon.gameObject);
     }
 
     private IEnumerator EndStageCoroutine(bool gameOver, FishGaugeUI ui)

@@ -62,7 +62,7 @@ public partial class FishTargetNew
         gaugeUI.ClearArrival();
         gaugeUI.HideCountdown();
         MoveToFishFocusCamera();
-        gaugeUI.Show(contestBalance, maxGauge);
+        gaugeUI.Show(contestBalance, maxGauge, roundsCompleted + 1);
 
         if (debugLog)
         {
@@ -81,9 +81,9 @@ public partial class FishTargetNew
     {
         bool playerWin = contestBalance >= maxGauge;
         currentState = playerWin ? FishState.PlayerWin : FishState.AIWin;
-        if (playerWin) aiStress = Mathf.Min(100f, aiStress + 25f);
-        else playerStress = Mathf.Min(100f, playerStress + 25f);
-        gaugeUI.UpdateStress(playerStress, aiStress);
+        roundsCompleted++;
+        if (!playerWin && playerProgress != null) playerProgress.ChangeStress(20f);
+        gaugeUI.UpdateStress(PlayerStress, 0f);
         CharacterDamageFlash.Play(playerWin ? enemyIntro != null ? enemyIntro.transform : null :
             playerAnimator != null ? playerAnimator.transform : null);
 
@@ -94,7 +94,7 @@ public partial class FishTargetNew
         if (debugLog)
         {
             string result = playerWin ? "플레이어 승리, 물고기 훔치기 성공" : "AI 승리, 물고기를 빼앗지 못함";
-            Debug.Log($"{name}: 대결 종료 / 줄다리기 {contestBalance:0} / Player Stress {playerStress:0}% / AI Stress {aiStress:0}% / {result}");
+            Debug.Log($"{name}: {roundsCompleted}/4라운드 / 줄다리기 {contestBalance:0} / Player Stress {PlayerStress:0}% / {result}");
         }
 
         StartCoroutine(MoveFishToWinner(playerWin));

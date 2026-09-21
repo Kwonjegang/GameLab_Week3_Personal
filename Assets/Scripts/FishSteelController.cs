@@ -8,11 +8,13 @@ public class FishSteelController : MonoBehaviour
 
     private InputSystem_Actions inputActions;
     private PlayerController playerController;
+    private UnderwaterFishSpawner underwaterSpawner;
 
     private void Awake()
     {
         inputActions = new InputSystem_Actions();
         playerController = GetComponent<PlayerController>();
+        underwaterSpawner = FindFirstObjectByType<UnderwaterFishSpawner>();
     }
 
     private void OnEnable()
@@ -27,15 +29,14 @@ public class FishSteelController : MonoBehaviour
 
     private void Update()
     {
-        if (!playerController.isStageStarted)
+        if (!inputActions.Player.Attack.WasPressedThisFrame()) return;
+        if (playerController.IsGameOver) return;
+        if (playerController.IsInWater && !playerController.isStageStarted)
         {
+            if (underwaterSpawner != null) underwaterSpawner.TryParry();
             return;
         }
-
-        if (inputActions.Player.Attack.WasPressedThisFrame())
-        {
-            TryPressF();
-        }
+        if (playerController.isStageStarted) TryPressF();
     }
 
     private void TryPressF()
