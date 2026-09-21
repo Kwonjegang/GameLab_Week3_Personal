@@ -7,10 +7,12 @@ public class FishSteelController : MonoBehaviour
     [SerializeField] private bool debugLog = true;
 
     private InputSystem_Actions inputActions;
+    private PlayerController playerController;
 
     private void Awake()
     {
         inputActions = new InputSystem_Actions();
+        playerController = GetComponent<PlayerController>();
     }
 
     private void OnEnable()
@@ -25,6 +27,11 @@ public class FishSteelController : MonoBehaviour
 
     private void Update()
     {
+        if (!playerController.isStageStarted)
+        {
+            return;
+        }
+
         if (inputActions.Player.Attack.WasPressedThisFrame())
         {
             TryPressF();
