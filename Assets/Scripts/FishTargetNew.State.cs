@@ -82,7 +82,7 @@ public partial class FishTargetNew
         bool playerWin = contestBalance >= maxGauge;
         currentState = playerWin ? FishState.PlayerWin : FishState.AIWin;
         roundsCompleted++;
-        if (!playerWin && playerProgress != null) playerProgress.ChangeStress(20f);
+        if (!playerWin && playerProgress != null) playerProgress.ChangeStress(40f);
         gaugeUI.UpdateStress(PlayerStress, 0f);
         CharacterDamageFlash.Play(playerWin ? enemyIntro != null ? enemyIntro.transform : null :
             playerAnimator != null ? playerAnimator.transform : null);

@@ -226,7 +226,7 @@ public partial class FishTargetNew : MonoBehaviour
         float previousScale = Time.timeScale;
         Time.timeScale = Mathf.Max(0.05f, previousScale * 0.12f);
         yield return new WaitForSecondsRealtime(0.07f);
-        Time.timeScale = previousScale;
+        if (Time.timeScale > 0f) Time.timeScale = previousScale;
     }
 
     private void AddPlayerMashGauge()

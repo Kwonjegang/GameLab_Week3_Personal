@@ -119,6 +119,8 @@ public class FishGaugeUI : MonoBehaviour
     public void ShowGameOver()
     {
         if (gameOverRoot != null) gameOverRoot.SetActive(true);
+        GameSessionController session = FindFirstObjectByType<GameSessionController>();
+        if (session != null) session.OnGameOverShown();
     }
 
     public void HideGameOver()
@@ -128,7 +130,7 @@ public class FishGaugeUI : MonoBehaviour
 
     public void ShowRewardResult(int value, int count)
     {
-        if (rewardResultText != null) rewardResultText.text = $"REWARD!\n{value} x {count}\nSTRESS -35%";
+        if (rewardResultText != null) rewardResultText.text = $"REWARD!\n{value} x {count}\nSTRESS -5%";
         if (rewardResultRoot != null) rewardResultRoot.SetActive(true);
     }
 

@@ -23,7 +23,13 @@ public class UnderwaterFishSpawner : MonoBehaviour
 
     private void Update()
     {
-        if (player == null || progress == null || progress.IsGameOver) return;
+        if (Time.timeScale == 0f) return;
+        if (player == null || progress == null) return;
+        if (progress.IsGameOver || player.IsGameOver)
+        {
+            if (activeFish != null) Destroy(activeFish.gameObject);
+            return;
+        }
         if (!player.IsInWater || player.isStageStarted)
         {
             if (activeFish != null) Destroy(activeFish.gameObject);

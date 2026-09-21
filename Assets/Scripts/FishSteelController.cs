@@ -29,6 +29,7 @@ public class FishSteelController : MonoBehaviour
 
     private void Update()
     {
+        if (Time.timeScale == 0f) return;
         if (!inputActions.Player.Attack.WasPressedThisFrame()) return;
         if (playerController.IsGameOver) return;
         if (playerController.IsInWater && !playerController.isStageStarted)

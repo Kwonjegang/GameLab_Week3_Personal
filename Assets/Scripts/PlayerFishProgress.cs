@@ -13,6 +13,9 @@ public class PlayerFishProgress : MonoBehaviour
 
     public float Stress => stress;
     public int TotalValue => fish500 * 500 + fish1000 * 1000 + fish1500 * 1500;
+    public int Fish500 => fish500;
+    public int Fish1000 => fish1000;
+    public int Fish1500 => fish1500;
     public bool IsGameOver => gameOver;
 
     private void Awake()
@@ -45,6 +48,8 @@ public class PlayerFishProgress : MonoBehaviour
         if (stress >= 100f)
         {
             gameOver = true;
+            GameSessionController session = FindFirstObjectByType<GameSessionController>();
+            if (session != null) session.StopClockForGameOver();
             if (player != null)
             {
                 if (player.IsInWater) player.DrownGameOver(ui);

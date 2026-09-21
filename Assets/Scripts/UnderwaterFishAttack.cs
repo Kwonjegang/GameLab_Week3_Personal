@@ -40,6 +40,7 @@ public class UnderwaterFishAttack : MonoBehaviour
 
     private void Update()
     {
+        if (Time.timeScale == 0f) return;
         if (player == null || finished) return;
         if (!player.IsInWater || progress.IsGameOver) { Finish(); return; }
         Vector3 target = AttackTarget();
@@ -61,7 +62,7 @@ public class UnderwaterFishAttack : MonoBehaviour
         if (!glowing && remaining <= speed * 0.45f && remaining > 3.5f) SetGlow(true);
         if (Vector3.Distance(transform.position, target) < 3.5f)
         {
-            progress.ChangeStress(10f);
+            progress.ChangeStress(20f);
             Finish();
         }
     }
@@ -146,7 +147,7 @@ public class UnderwaterFishAttack : MonoBehaviour
     private void RestoreTimeScale()
     {
         if (!timeSlowed) return;
-        Time.timeScale = previousTimeScale;
+        if (Time.timeScale > 0f) Time.timeScale = previousTimeScale;
         timeSlowed = false;
     }
 

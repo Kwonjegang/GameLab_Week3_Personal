@@ -1,6 +1,7 @@
 using UnityEngine;
 using Unity.Cinemachine;
 using System.Collections;
+using UnityEngine.InputSystem;
 
 [RequireComponent(typeof(CharacterController))]
 
@@ -32,6 +33,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("Look & Rotate")]
     [SerializeField] private float lookSensitivity = 0.15f;
+    [SerializeField] private float gamepadLookSensitivity = 2.5f;
 
     [Header("Camera Look")]
     [SerializeField] private CinemachineOrbitalFollow orbitalFollow;
@@ -40,6 +42,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float minCameraPitch = -10f;
     [SerializeField] private float maxCameraPitch = 75f;
     [SerializeField] private Transform playerVisual;
+    [SerializeField] private float backwardCameraDistance = 2.5f;
 
     [Header("Water")]
     [SerializeField] private Transform waterSurface;
@@ -69,6 +72,8 @@ public class PlayerController : MonoBehaviour
     private float dashTime = 1f;
     private float freeLookYaw;
     private float cameraPitch;
+    private float verticalSensitivityRatio;
+    private float baseOrbitRadius;
     private float backwardBlend;
     private Quaternion visualReadyRotation;
     private bool isBackwardRunning;
@@ -83,6 +88,14 @@ public class PlayerController : MonoBehaviour
 
     public bool IsInWater => isInWater;
     public bool IsGameOver => isGameOver;
+    public float MouseSensitivity => lookSensitivity;
+    public float GamepadSensitivity => gamepadLookSensitivity;
+
+    public void SetLookSensitivities(float mouse, float gamepad)
+    {
+        lookSensitivity = Mathf.Clamp(mouse, 0.02f, 1f);
+        gamepadLookSensitivity = Mathf.Clamp(gamepad, 0.2f, 8f);
+    }
 
     InputSystem_Actions inputActions;
     Coroutine dashCoroutine;
@@ -116,7 +129,9 @@ public class PlayerController : MonoBehaviour
         if (orbitalFollow != null)
         {
             cameraPitch = orbitalFollow.VerticalAxis.Value;
+            baseOrbitRadius = orbitalFollow.Radius;
         }
+        verticalSensitivityRatio = verticalLookSensitivity / Mathf.Max(0.01f, lookSensitivity);
 
         if (followCamera != null)
         {
@@ -130,6 +145,7 @@ public class PlayerController : MonoBehaviour
     }
     void Update()
     {
+        if (Time.timeScale == 0f) return;
         if (isGameOver) return;
         if (isUsingSunbed)
         {
@@ -260,6 +276,10 @@ public class PlayerController : MonoBehaviour
         if (playerVisual != null)
             playerVisual.localRotation = Quaternion.Slerp(visualReadyRotation,
                 visualReadyRotation * Quaternion.Euler(0f, 180f, 0f), backwardBlend);
+        if (orbitalFollow != null)
+            orbitalFollow.Radius = Mathf.Lerp(orbitalFollow.Radius,
+                baseOrbitRadius + backwardCameraDistance * backwardBlend,
+                1f - Mathf.Exp(-5f * Time.deltaTime));
     }
     public void Dash()
     {
@@ -279,11 +299,14 @@ public class PlayerController : MonoBehaviour
 
         bool isFreeLook = inputActions.Player.FreeLook.IsPressed();
 
-        float yaw = lookInput.x * lookSensitivity;
+        bool gamepad = inputActions.Player.Look.activeControl != null &&
+            inputActions.Player.Look.activeControl.device is Gamepad;
+        float multiplier = gamepad ? gamepadLookSensitivity * 60f * Time.deltaTime : lookSensitivity;
+        float yaw = lookInput.x * multiplier;
 
         if (orbitalFollow != null)
         {
-            cameraPitch -= lookInput.y * verticalLookSensitivity;
+            cameraPitch -= lookInput.y * multiplier * verticalSensitivityRatio;
             cameraPitch = Mathf.Clamp(cameraPitch, minCameraPitch, maxCameraPitch);
 
             orbitalFollow.VerticalAxis.Value = cameraPitch;
@@ -426,16 +449,7 @@ public class PlayerController : MonoBehaviour
         verticalVelocity = 0f;
         playerAnimator.SetBool("IsSwimming", false);
         playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
-        GameObject icon = new GameObject("StunIcon");
-        stunIcon = icon.transform;
-        stunIcon.SetParent(transform, false);
-        stunIcon.localPosition = Vector3.up * 11f;
-        TextMesh label = icon.AddComponent<TextMesh>();
-        label.text = "Zz";
-        label.fontSize = 72;
-        label.characterSize = 0.18f;
-        label.anchor = TextAnchor.MiddleCenter;
-        label.color = new Color(1f, 0.9f, 0.35f);
+        ShowStunIcon();
         yield return new WaitForSeconds(0.75f);
         controller.enabled = false;
         float elapsed = 0f;
@@ -453,8 +467,24 @@ public class PlayerController : MonoBehaviour
         if (stunIcon != null) Destroy(stunIcon.gameObject);
     }
 
+    private void ShowStunIcon()
+    {
+        if (stunIcon != null) return;
+        GameObject icon = new GameObject("StunIcon");
+        stunIcon = icon.transform;
+        stunIcon.SetParent(transform, false);
+        stunIcon.localPosition = Vector3.up * 11f;
+        TextMesh label = icon.AddComponent<TextMesh>();
+        label.text = "Zz";
+        label.fontSize = 72;
+        label.characterSize = 0.18f;
+        label.anchor = TextAnchor.MiddleCenter;
+        label.color = new Color(1f, 0.9f, 0.35f);
+    }
+
     private IEnumerator EndStageCoroutine(bool gameOver, FishGaugeUI ui)
     {
+        if (gameOver && enemyIntro != null) enemyIntro.ResetStage();
         isStageStarted = false;
         isUsingSunbed = false;
         isActionLocked = gameOver;
@@ -463,6 +493,7 @@ public class PlayerController : MonoBehaviour
         isBackwardRunning = false;
         backwardBlend = 0f;
         if (playerVisual != null) playerVisual.localRotation = visualReadyRotation;
+        if (orbitalFollow != null) orbitalFollow.Radius = baseOrbitRadius;
         playerAnimator.SetBool("IsSwimming", false);
         playerAnimator.Rebind();
         playerAnimator.Update(0f);
@@ -474,10 +505,32 @@ public class PlayerController : MonoBehaviour
         if (gameOver)
         {
             isGameOver = true;
+            ShowStunIcon();
             playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
             yield return new WaitForSeconds(1.6f);
             if (ui != null) ui.ShowGameOver();
         }
+    }
+
+    public void StopForSettlement()
+    {
+        StopAllCoroutines();
+        if (isStageStarted || isUsingSunbed)
+        {
+            if (enemyIntro != null) enemyIntro.ResetStage();
+            controller.enabled = false;
+            transform.SetPositionAndRotation(preStagePosition, preStageRotation);
+            controller.enabled = true;
+            if (stageCamera != null) stageCamera.gameObject.SetActive(false);
+            if (followCamera != null) followCamera.gameObject.SetActive(true);
+        }
+        isStageStarted = false;
+        isUsingSunbed = false;
+        isActionLocked = true;
+        isGameOver = true;
+        moveDirection = Vector3.zero;
+        verticalVelocity = 0f;
+        if (orbitalFollow != null) orbitalFollow.Radius = baseOrbitRadius;
     }
     IEnumerator DashCoroutine()
     {

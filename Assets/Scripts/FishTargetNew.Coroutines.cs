@@ -166,7 +166,7 @@ public partial class FishTargetNew
             if (playerProgress != null)
             {
                 playerProgress.AddFish(value, count);
-                playerProgress.ChangeStress(-35f);
+                playerProgress.ChangeStress(-5f);
             }
             gaugeUI.ShowRewardResult(value, count);
             yield return new WaitForSeconds(1.1f);
