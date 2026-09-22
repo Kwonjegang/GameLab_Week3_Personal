@@ -9,16 +9,18 @@ using UnityEngine.UI;
 public class GameSessionController : MonoBehaviour
 {
     [Header("Day Rules")]
-    [SerializeField, Range(0, 23)] private int startHour = 8;
-    [SerializeField, Range(1, 24)] private int endHour = 22;
+    [SerializeField, Range(0, 23)] private int startHour = 9;
+    [SerializeField, Range(1, 24)] private int endHour = 15;
+    [Tooltip("현실 시간 몇 초마다 게임 시간 1시간이 지나는지 설정합니다.")]
     [SerializeField, Min(1f)] private float secondsPerGameHour = 45f;
-    [SerializeField, Min(0)] private int targetScore = 10000;
+    [SerializeField, Min(0)] private int targetScore = 20000;
 
     [Header("Scene")]
     [SerializeField] private PlayerController player;
     [SerializeField] private PlayerFishProgress progress;
     [SerializeField] private FishGaugeUI fishUI;
     [SerializeField] private Text clockText;
+    [SerializeField] private TitleSequenceController titleSequence;
     [SerializeField] private GameObject settlementPanel;
     [SerializeField] private Text settlementText;
     [SerializeField] private GameObject gameOverPanel;
@@ -49,12 +51,16 @@ public class GameSessionController : MonoBehaviour
     private float elapsedRealSeconds;
     private bool clockStopped;
     private bool paused;
+    private GameObject mainReturnPanel;
+    private bool mainReturnClockStopped;
+    private bool mainReturnPaused;
 
     private void Awake()
     {
         if (player == null) player = FindFirstObjectByType<PlayerController>();
         if (progress == null && player != null) progress = player.GetComponent<PlayerFishProgress>();
         if (fishUI == null) fishUI = FindFirstObjectByType<FishGaugeUI>();
+        if (titleSequence == null) titleSequence = GetComponent<TitleSequenceController>();
         EnsureEventSystem();
         Bind(gameOverRetryButton, Retry);
         Bind(gameOverMainButton, ShowMainMenu);
@@ -86,12 +92,18 @@ public class GameSessionController : MonoBehaviour
                 PlayerPrefs.GetFloat("GamepadSensitivity", player.GamepadSensitivity));
         UpdateSensitivityLabels();
         UpdateClock(startHour * 60);
+        if (clockText != null && titleSequence != null && titleSequence.IsShowing)
+            clockText.gameObject.SetActive(false);
     }
 
     private void Update()
     {
+        if (titleSequence != null && titleSequence.IsShowing) return;
+        if (clockText != null && !clockStopped && !clockText.gameObject.activeSelf)
+            clockText.gameObject.SetActive(true);
         if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
         {
+            if (mainMenuPanel != null && mainMenuPanel.activeSelf) { ReturnFromMainMenu(); return; }
             TogglePause();
         }
         if (paused) return;
@@ -166,7 +178,7 @@ public class GameSessionController : MonoBehaviour
 
     private string BuildSettlementText(int count500, int count1000, int count1500, int displayedTotal, bool complete)
     {
-        return $"22:00  DAY SETTLEMENT\n\n" +
+        return $"{endHour:00}:00  DAY SETTLEMENT\n\n" +
                $"500  x {count500}  = {count500 * 500:N0}\n" +
                $"1000 x {count1000}  = {count1000 * 1000:N0}\n" +
                $"1500 x {count1500}  = {count1500 * 1500:N0}\n\n" +
@@ -188,6 +200,12 @@ public class GameSessionController : MonoBehaviour
 
     public void ShowMainMenu()
     {
+        mainReturnPanel = pausePanel != null && pausePanel.activeSelf ? pausePanel :
+            settingsPanel != null && settingsPanel.activeSelf ? settingsPanel :
+            gameOverPanel != null && gameOverPanel.activeSelf ? gameOverPanel :
+            settlementPanel != null && settlementPanel.activeSelf ? settlementPanel : null;
+        mainReturnClockStopped = clockStopped;
+        mainReturnPaused = paused;
         clockStopped = true;
         paused = false;
         if (clockText != null) clockText.gameObject.SetActive(false);
@@ -198,6 +216,17 @@ public class GameSessionController : MonoBehaviour
         if (mainMenuPanel != null) mainMenuPanel.SetActive(true);
         ShowPointer();
         Time.timeScale = 0f;
+    }
+
+    private void ReturnFromMainMenu()
+    {
+        if (mainMenuPanel != null) mainMenuPanel.SetActive(false);
+        if (mainReturnPanel != null) mainReturnPanel.SetActive(true);
+        clockStopped = mainReturnClockStopped;
+        paused = mainReturnPaused;
+        if (clockText != null && !clockStopped) clockText.gameObject.SetActive(true);
+        Time.timeScale = 0f;
+        ShowPointer();
     }
 
     private void TogglePause()

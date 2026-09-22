@@ -2,6 +2,8 @@ using UnityEngine;
 using Unity.Cinemachine;
 using System.Collections;
 using UnityEngine.InputSystem;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 [RequireComponent(typeof(CharacterController))]
 
@@ -49,6 +51,11 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float waterDoubleTapWindow = 0.35f;
     [SerializeField] private float waterEscapeJumpHeight = 40f;
     [SerializeField] private float waterSinkSpeed = 3f;
+    [Header("Underwater Post Processing")]
+    [SerializeField] private Color underwaterColorFilter = new Color(0.35f, 0.68f, 0.92f);
+    [SerializeField, Range(-2f, 0f)] private float underwaterExposure = -0.35f;
+    [SerializeField, Range(0f, 1f)] private float underwaterVignette = 0.3f;
+    [SerializeField, Min(0.01f)] private float underwaterFadeSpeed = 3f;
 
     [Header("Sunbed")]
     [SerializeField] private Transform interactionPoint;
@@ -78,12 +85,18 @@ public class PlayerController : MonoBehaviour
     private Quaternion visualReadyRotation;
     private bool isBackwardRunning;
     private bool isInWater;
+    private Volume underwaterVolume;
+    private VolumeProfile underwaterProfile;
+    private UniversalAdditionalCameraData mainCameraData;
+    private bool originalPostProcessing;
     private bool isGameOver;
     private float lastWaterJumpPress = -10f;
     private float lastWaterBurstTime = -10f;
     private Vector3 preStagePosition;
     private Quaternion preStageRotation;
     private bool stageEnding;
+    [SerializeField, Min(0f)] private float sunbedReplayCooldown = 5f;
+    private float nextSunbedTime;
     private Transform stunIcon;
 
     public bool IsInWater => isInWater;
@@ -117,6 +130,7 @@ public class PlayerController : MonoBehaviour
         controller = GetComponent<CharacterController>();
         playerAnimator = GetComponent<Animator>();
         if (playerVisual != null) visualReadyRotation = playerVisual.localRotation;
+        InitializeUnderwaterPostProcessing();
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -229,9 +243,51 @@ public class PlayerController : MonoBehaviour
         }
         if (isInWater != wasInWater)
         {
+            if (isInWater && dashCoroutine != null) CancelDashForWater();
             playerAnimator.SetBool("IsSwimming", isInWater);
             lastWaterJumpPress = -10f;
         }
+    }
+
+    private void InitializeUnderwaterPostProcessing()
+    {
+        if (Camera.main == null) return;
+        mainCameraData = Camera.main.GetUniversalAdditionalCameraData();
+        originalPostProcessing = mainCameraData.renderPostProcessing;
+        underwaterProfile = ScriptableObject.CreateInstance<VolumeProfile>();
+        ColorAdjustments color = underwaterProfile.Add<ColorAdjustments>(true);
+        color.colorFilter.Override(underwaterColorFilter);
+        color.postExposure.Override(underwaterExposure);
+        color.saturation.Override(-18f);
+        Vignette vignette = underwaterProfile.Add<Vignette>(true);
+        vignette.color.Override(new Color(0.02f, 0.13f, 0.27f));
+        vignette.intensity.Override(underwaterVignette);
+        vignette.smoothness.Override(0.55f);
+        GameObject volumeObject = new GameObject("Underwater Post Processing");
+        underwaterVolume = volumeObject.AddComponent<Volume>();
+        underwaterVolume.isGlobal = true;
+        underwaterVolume.priority = 100f;
+        underwaterVolume.weight = 0f;
+        underwaterVolume.sharedProfile = underwaterProfile;
+    }
+
+    private void UpdateUnderwaterPostProcessing()
+    {
+        if (underwaterVolume == null || mainCameraData == null) return;
+        Renderer surface = waterSurface != null ? waterSurface.GetComponent<Renderer>() : null;
+        Camera view = Camera.main;
+        bool cameraUnderwater = false;
+        if (view != null && surface != null && followCamera != null && followCamera.gameObject.activeInHierarchy)
+        {
+            Vector3 position = view.transform.position;
+            Bounds bounds = surface.bounds;
+            cameraUnderwater = position.x >= bounds.min.x && position.x <= bounds.max.x &&
+                position.z >= bounds.min.z && position.z <= bounds.max.z &&
+                position.y < waterSurface.position.y;
+        }
+        underwaterVolume.weight = Mathf.MoveTowards(underwaterVolume.weight,
+            cameraUnderwater ? 1f : 0f, underwaterFadeSpeed * Time.deltaTime);
+        mainCameraData.renderPostProcessing = originalPostProcessing || underwaterVolume.weight > 0f;
     }
     bool IsGround()
     {
@@ -270,6 +326,7 @@ public class PlayerController : MonoBehaviour
 
     private void LateUpdate()
     {
+        UpdateUnderwaterPostProcessing();
         if (stunIcon != null && Camera.main != null) stunIcon.rotation = Camera.main.transform.rotation;
         if (isGameOver || isUsingSunbed) return;
         backwardBlend = Mathf.MoveTowards(backwardBlend, isBackwardRunning ? 1f : 0f, Time.deltaTime * 3.5f);
@@ -288,7 +345,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (inputActions.Player.Dash.WasPressedThisFrame() && isGround)
+        if (inputActions.Player.Dash.WasPressedThisFrame() && isGround && !isInWater)
         {
             dashCoroutine = StartCoroutine(DashCoroutine());
         }
@@ -338,7 +395,20 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (isActionLocked || dashCoroutine != null ||interactionPoint == null || liePoint == null || followCamera == null || stageCamera == null)
+        if (isActionLocked || stageEnding || Time.time < nextSunbedTime || dashCoroutine != null)
+            return;
+
+        if (SunbedStation.HasStations)
+        {
+            SunbedStation station = SunbedStation.FindNearest(transform.position, interactionRange);
+            if (station == null) return;
+            interactionPoint = station.InteractionPoint;
+            liePoint = station.LiePoint;
+            stageCamera = station.StageCamera;
+            enemyIntro = station.EnemyIntro;
+        }
+
+        if (interactionPoint == null || liePoint == null || followCamera == null || stageCamera == null)
         {
             return;
         }
@@ -385,8 +455,7 @@ public class PlayerController : MonoBehaviour
         controller.enabled = false;
 
         Vector3 startPosition = transform.position;
-        Vector3 endPosition = liePoint.position;
-        endPosition.x += 2.5f;
+        Vector3 endPosition = liePoint.position + liePoint.rotation * (Vector3.right * 2.5f);
 
         Quaternion startRotation = transform.rotation;
         Quaternion endRotation = Quaternion.Euler(0f, liePoint.eulerAngles.y, 0f);
@@ -450,6 +519,7 @@ public class PlayerController : MonoBehaviour
         playerAnimator.SetBool("IsSwimming", false);
         playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
         ShowStunIcon();
+        float deathDuration = DeathAnimationDuration();
         yield return new WaitForSeconds(0.75f);
         controller.enabled = false;
         float elapsed = 0f;
@@ -459,12 +529,16 @@ public class PlayerController : MonoBehaviour
             transform.position += Vector3.down * 4f * Time.deltaTime;
             yield return null;
         }
+        if (deathDuration > 2.75f) yield return new WaitForSeconds(deathDuration - 2.75f);
         if (ui != null) ui.ShowGameOver();
     }
 
     private void OnDestroy()
     {
         if (stunIcon != null) Destroy(stunIcon.gameObject);
+        if (mainCameraData != null) mainCameraData.renderPostProcessing = originalPostProcessing;
+        if (underwaterVolume != null) Destroy(underwaterVolume.gameObject);
+        if (underwaterProfile != null) Destroy(underwaterProfile);
     }
 
     private void ShowStunIcon()
@@ -507,9 +581,35 @@ public class PlayerController : MonoBehaviour
             isGameOver = true;
             ShowStunIcon();
             playerAnimator.CrossFade("ZombieStumbling", 0.08f, 0, 0f);
-            yield return new WaitForSeconds(1.6f);
+            yield return new WaitForSeconds(DeathAnimationDuration());
             if (ui != null) ui.ShowGameOver();
         }
+        else
+        {
+            nextSunbedTime = Time.time + sunbedReplayCooldown;
+            isActionLocked = false;
+            stageEnding = false;
+        }
+    }
+
+    private float DeathAnimationDuration()
+    {
+        if (playerAnimator != null && playerAnimator.runtimeAnimatorController != null)
+            foreach (AnimationClip clip in playerAnimator.runtimeAnimatorController.animationClips)
+                if (clip != null && clip.name.Contains("Zombie")) return Mathf.Max(1.6f, clip.length + 0.08f);
+        return 2.5f;
+    }
+
+    private void CancelDashForWater()
+    {
+        StopCoroutine(dashCoroutine);
+        dashCoroutine = null;
+        isActionLocked = false;
+        moveDirection = Vector3.zero;
+        verticalVelocity = Mathf.Min(verticalVelocity, 0f);
+        playerAnimator.ResetTrigger("Dash");
+        playerAnimator.ResetTrigger("StandUp");
+        playerAnimator.CrossFade("Swimming", 0.08f, 0, 0f);
     }
 
     public void StopForSettlement()

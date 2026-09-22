@@ -33,7 +33,7 @@ public class UnderwaterFishAttack : MonoBehaviour
         value = Values[Mathf.Clamp(type, 0, Values.Length - 1)];
         waterHeight = surfaceY;
         modelForwardEuler = forwardOffset;
-        ui = FindFirstObjectByType<FishGaugeUI>();
+        ui = FindFirstObjectByType<FishGaugeUI>(FindObjectsInactive.Include);
         baseScale = transform.localScale;
         renderers = GetComponentsInChildren<Renderer>();
     }
