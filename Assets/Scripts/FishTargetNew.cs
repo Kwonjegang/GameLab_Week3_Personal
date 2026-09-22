@@ -139,7 +139,8 @@ public partial class FishTargetNew : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (playerFishingRod != null && playerFishingRod.activeSelf && playerRodSocket != null)
+        if (currentState != FishState.Idle && !stageComplete &&
+            playerFishingRod != null && playerFishingRod.activeSelf && playerRodSocket != null)
         {
             Transform rod = playerFishingRod.transform;
             rod.position = playerRodSocket.TransformPoint(playerRodGripLocalPosition);
